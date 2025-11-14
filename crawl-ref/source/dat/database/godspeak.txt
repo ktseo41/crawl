@@ -121,19 +121,19 @@ Xom adds some personal touches to your environment.
 
 @Xom scenery generic@
 %%%%
-Xom scenery cache of fruit
+Xom scenery cache_of_fruit
 
 Xom accidentally drops some snacks.
 
 Xom prepares the finest cultivars of fruit found anywhere, then drops them.
 %%%%
-Xom scenery cache of meat
+Xom scenery cache_of_meat
 
 Xom [offers|fetches] you some snacks.
 
 Xom prepares a banquet formed from your trail of carnage through the Dungeon.
 %%%%
-Xom scenery cache of baked goods
+Xom scenery cache_of_baked_goods
 
 Xom offers some snacks, fresh out of the oven.
 %%%%
@@ -535,7 +535,9 @@ Xom ring slot
 
 @Your_item@ twitches!
 
-@Your_item@ briefly expands and covers your entire @hand@!
+@Your_item@ briefly dulls, then brightens again!
+
+@Your_item@ briefly brightens, then dulls again!
 %%%%
 Xom dragon armour
 
@@ -636,6 +638,8 @@ Xom send in the clones
 Xom feels like there should be more of you to share with the Dungeon.
 
 Xom gently smashes a mirror over your [@random_body_part_external_singular@|@random_body_part_external_plural@].
+
+"Multiply and go forth!"
 %%%%
 # drain your mp, produce magicspawn
 Xom brain drain

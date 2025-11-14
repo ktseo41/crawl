@@ -872,7 +872,7 @@ void bolt::bounce()
     // shadows, Robe of Night)
     if (bounces == 1)
     {
-        extra_range_used -= spell_range(origin_spell, ench_power, true, true)
+        extra_range_used -= spell_range(origin_spell, agent(), ench_power, true)
                             - range;
     }
 
@@ -1005,11 +1005,8 @@ void bolt::burn_wall_effect()
     {
         for (adjacent_iterator ai(pos()); ai; ++ai)
         {
-            if (!in_bounds(*ai) || cloud_at(*ai) || is_sanctuary(*ai)
-                || cell_is_solid(*ai) || !cell_see_cell(*ai, source, LOS_NO_TRANS))
-            {
+            if (!cell_see_cell(*ai, source, LOS_NO_TRANS))
                 continue;
-            }
 
             if (one_chance_in(3))
                 place_cloud(CLOUD_FIRE, *ai, random_range(11, 25), agent());
@@ -1081,9 +1078,15 @@ void bolt::affect_cell()
 {
     fake_flavour();
 
+    monster *m = monster_at(pos());
+
     // Note that this can change the solidity of the wall.
-    if (cell_is_solid(pos()))
+    if (cell_is_solid(pos())
+        // Wall affecting beams still do even with a monster there.
+        && (!m || can_affect_wall(pos())))
+    {
         affect_wall();
+    }
 
     if (origin_spell == SPELL_CHAIN_LIGHTNING && pos() != target)
         return;
@@ -1111,12 +1114,16 @@ void bolt::affect_cell()
     // affected the player on this square. -cao
     if (!hit_player || pierce || is_explosion)
     {
-        monster *m = monster_at(pos());
         if (m && can_affect_actor(m))
         {
             const bool ignored = ignores_monster(m);
             affect_monster(m);
-            if (hit == AUTOMATIC_HIT && !pierce && !ignored
+            const dungeon_feature_type feat = env.grid(pos());
+            if (hit == AUTOMATIC_HIT && !ignored
+                // Piercing beams are still stopped by wall monsters
+                // unless they were going to bounce
+                && (!pierce || cell_is_solid(pos())
+                        && !is_bouncy(feat) && !is_explosion)
                 && (!is_tracer() || (agent() && m->visible_to(agent()))))
             {
                 finish_beam();
@@ -1221,6 +1228,10 @@ void bolt::do_fire()
         ray.advance();
     }
 
+    // Tracks if the *last* cell seen was a wall monster, therefore pretend
+    // next cell is solid for purposes of bouncing or stopping the beam.
+    bool wall_monster_hit = false;
+
     // Note: nothing but this loop should be changing the ray.
     while (map_bounds(pos()))
     {
@@ -1272,19 +1283,23 @@ void bolt::do_fire()
                         feature_description_at(pos(), false, DESC_A) :
                         monster_at(pos())->name(DESC_A);
 
-            mprf("Your line of fire to %s is blocked by %s.",
-                 blockee.c_str(), blocker.c_str());
-            tracer->cancel();
+            tracer->blocked("Your line of fire to " + blockee
+                            + " is blocked by " + blocker + ".");
             finish_beam();
             return;
         }
-
+        const monster* mon_at = monster_at(pos());
         // digging is taken care of in affect_cell
         if (feat_is_solid(feat) && !can_affect_wall(pos())
-                                                    && flavour != BEAM_DIGGING)
+            && flavour != BEAM_DIGGING)
         {
-            if (is_bouncy(feat))
+            // If wall monster then don't bounce or explode, it's handled later
+            if (mon_at && !wall_monster_hit)
+                wall_monster_hit = true;
+            else if (is_bouncy(feat))
             {
+                // Reset so we can hit another
+                wall_monster_hit = false;
                 bounce();
                 // see comment in bounce(); the beam will be cancelled if this
                 // is a tracer and showing the bounce would be an info leak.
@@ -1342,6 +1357,7 @@ void bolt::do_fire()
         // Dig tracers continue through unseen cells.
         ASSERT(!cell_is_solid(pos())
                || is_tracer() && can_affect_wall(pos(), true)
+               || mon_at // If there *was* a monster (they might have died by now)
                || affects_nothing); // returning weapons
 
         const bool was_seen = seen;
@@ -1373,7 +1389,10 @@ void bolt::do_fire()
 
         noise_generated = false;
 
-        ray.advance();
+        // If a wall monster was hit and the beam is continuing, don't
+        // actually advance the ray: next iteration will take care of the bounce
+        if (!wall_monster_hit)
+            ray.advance();
     }
 
     if (!map_bounds(pos()))
@@ -1694,7 +1713,7 @@ int mons_adjust_flavoured(monster* mons, bolt &pbolt, int hurted,
         else if (hurted > original)
         {
             if (doFlavouredEffects)
-                simple_monster_message(*mons, " is frozen!");
+                simple_monster_message(*mons, " is chilled terribly!");
         }
         break;
 
@@ -1757,8 +1776,8 @@ int mons_adjust_flavoured(monster* mons, bolt &pbolt, int hurted,
         break;
 
     case BEAM_UMBRAL_TORCHLIGHT:
-        if (mons->holiness() & ~(MH_NATURAL | MH_DEMONIC | MH_HOLY)
-            || mons->god == GOD_YREDELEMNUL)
+        if (mons->god == GOD_YREDELEMNUL
+            || mons->holiness() & ~(MH_NATURAL | MH_DEMONIC | MH_HOLY))
         {
             if (doFlavouredEffects && !mons_aligned(mons, pbolt.agent(true)))
                 simple_monster_message(*mons, " completely resists.");
@@ -1943,11 +1962,9 @@ void bolt::apply_bolt_paralysis(monster* mons)
 {
     if (mons->paralysed() || mons->stasis())
         return;
-    // asleep monsters can still be paralysed (and will be always woken by
-    // trying to resist); the message might seem wrong but paralysis is
-    // always visible.
-    if (!mons_is_immotile(*mons)
-        && simple_monster_message(*mons, " suddenly stops moving!"))
+
+    if (!mons->is_firewood()
+        && simple_monster_message(*mons, " becomes paralysed!"))
     {
         obvious_effect = true;
     }
@@ -2149,7 +2166,7 @@ int silver_damages_victim(actor* victim, int damage, string &dmg_msg)
     {
         // For mutation damage, we want to count innate mutations for
         // demonspawn but not other species.
-        int multiplier = 5 * you.how_mutated(you.species == SP_DEMONSPAWN, true);
+        int multiplier = 5 * you.how_mutated(true, true);
         if (multiplier == 0)
             return 0;
 
@@ -2602,7 +2619,7 @@ void bolt::affect_endpoint()
         int to_place = ench_power;
         for (distance_iterator di(pos(), true, false, 2); di && to_place > 0; ++di)
         {
-            if (!cell_is_solid(*di) && cell_see_cell(*di, agent()->pos(), LOS_NO_TRANS))
+            if (cell_see_cell(*di, agent()->pos(), LOS_NO_TRANS))
             {
                 place_cloud(CLOUD_RUST, *di, 5 + ench_power * 2 / 3 + random2(2), agent());
                 to_place--;
@@ -2826,20 +2843,31 @@ void bolt::drop_object()
     ASSERT(item != nullptr);
     ASSERT(item->defined());
 
-    const int idx = copy_item_to_grid(*item, pos(), 1);
+    // If the player is throwing this item at a wall, attempt to place it at
+    // the tile on the path immediately before hitting the wall.
+    // XXX: If Dimensional Bullseye is active on a target in a wall, the
+    //      projectile will end up rewinding relative to the initial target,
+    //      not the bullseye one. This is technically incorrect, but probably
+    //      too minor to worry about.
+    const coord_def spot = cell_is_solid(pos())
+                                ? path_taken.size() >= 2
+                                    ? path_taken[path_taken.size() - 2]
+                                    : source
+                                : pos();
+    const int idx = copy_item_to_grid(*item, spot, 1);
 
     if (idx != NON_ITEM
         && idx != -1
         && item->sub_type == MI_THROWING_NET)
     {
-        monster* m = monster_at(pos());
+        monster* m = monster_at(spot);
         // Player or monster at position is caught in net.
         // Don't catch anything if the creature was already caught.
-        if (get_trapping_net(pos(), true) == NON_ITEM
-            && (you.pos() == pos() && you.attribute[ATTR_HELD]
+        if (get_trapping_net(spot, true) == NON_ITEM
+            && (you.pos() == spot && you.attribute[ATTR_HELD]
             || m && m->caught()))
         {
-            maybe_split_nets(env.item[idx], pos());
+            maybe_split_nets(env.item[idx], spot);
         }
     }
 }
@@ -2886,7 +2914,6 @@ void bolt::affect_ground()
         return;
 
     affect_place_clouds();
-
 }
 
 bool bolt::is_fiery() const
@@ -3042,9 +3069,6 @@ void bolt::affect_place_clouds()
 
         for (adjacent_iterator ai(pos()); ai; ++ai)
         {
-            if (feat_is_solid(env.grid(*ai)))
-                continue;
-
             if (x_chance_in_y(max(0, ench_power - 10), ench_power - 5))
             {
                 place_cloud(CLOUD_MEPHITIC, *ai,
@@ -3071,15 +3095,8 @@ void bolt::affect_place_clouds()
         place_cloud(CLOUD_MISERY, p, random2(5) + 8, agent());
 
         if (actor_at(p) && !mons_aligned(actor_at(p), agent()))
-        {
             for (adjacent_iterator ai(pos()); ai; ++ai)
-            {
-                if (feat_is_solid(env.grid(*ai)))
-                    continue;
-
                 place_cloud(CLOUD_MISERY, *ai, random2(4) + 2, agent());
-            }
-        }
     }
 
 }
@@ -3127,7 +3144,7 @@ void bolt::affect_place_explosion_clouds()
             mg.set_summoned(summ, SPELL_FIRE_STORM, summ_dur(1), false, false);
 
             // Spell-summoned monsters need to have a live summoner.
-            if (summ == nullptr || !summ->alive())
+            if (summ == nullptr || !summ->alive_or_reviving())
             {
                 if (!source_name.empty())
                     mg.non_actor_summoner = source_name;
@@ -3279,7 +3296,8 @@ bool bolt::is_harmless(const monster* mon) const
         return mon->res_poison() > 0 || mon->clarity();
 
     case BEAM_UMBRAL_TORCHLIGHT:
-        return (bool)!(mon->holiness() & (MH_NATURAL | MH_DEMONIC | MH_HOLY));
+        return mon->god == GOD_YREDELEMNUL
+               || (bool)!(mon->holiness() & (MH_NATURAL | MH_DEMONIC | MH_HOLY));
 
     default:
         return false;
@@ -3321,7 +3339,7 @@ bool bolt::harmless_to_player() const
     case BEAM_AGILITY:
     case BEAM_INVISIBILITY:
     case BEAM_RESISTANCE:
-    case BEAM_DOUBLE_HEALTH:
+    case BEAM_DOUBLE_VIGOUR:
         return true;
 
     case BEAM_HOLY:
@@ -3360,7 +3378,7 @@ bool bolt::harmless_to_player() const
 
     case BEAM_UMBRAL_TORCHLIGHT:
         return you_worship(GOD_YREDELEMNUL)
-                || (bool)!(you.holiness() & (MH_NATURAL | MH_DEMONIC | MH_HOLY));
+               || (bool)!(you.holiness() & (MH_NATURAL | MH_DEMONIC | MH_HOLY));
 
     case BEAM_QAZLAL:
         return true;
@@ -3751,6 +3769,7 @@ void bolt::affect_player_enchantment(bool resistible)
         break;
 
     case BEAM_WEAKNESS:
+        // actor::weaken already is randomized- why are we randomizing input?
         you.weaken(agent(), 8 + random2(4));
         obvious_effect = true;
         break;
@@ -3963,6 +3982,11 @@ void bolt::affect_player_enchantment(bool resistible)
         obvious_effect = true;
         nasty = false;
         nice  = true;
+        break;
+
+    case BEAM_DIMINISH_SPELLS:
+        you.diminish(agent(), 9);
+        obvious_effect = true;
         break;
 
     case BEAM_SAP_MAGIC:
@@ -4282,7 +4306,11 @@ void bolt::affect_player()
     // Visible beams reveal invisible monsters; otherwise animations confer
     // an information advantage for sighted players
     if (visible() && agent() && agent()->is_monster())
-        agent()->as_monster()->unseen_pos = agent()->pos();
+    {
+        monster* mons = agent()->as_monster();
+        mons->revealed_this_turn = true;
+        mons->revealed_at_pos = mons->pos();
+    }
 
     if (misses_player())
         return;
@@ -5964,6 +5992,7 @@ bool bolt::has_saving_throw() const
     case BEAM_SHADOW_TORPOR:
     case BEAM_ILL_OMEN:
     case BEAM_WARP_BODY:
+    case BEAM_DIMINISH_SPELLS:
         return false;
     case BEAM_VULNERABILITY:
         return !one_chance_in(3);  // Ignores will 1/3 of the time
@@ -6044,6 +6073,7 @@ bool ench_flavour_affects_monster(actor *agent, beam_type flavour,
         rc = (mon->res_poison() < 3);
         break;
 
+    case BEAM_DIMINISH_SPELLS:
     case BEAM_DRAIN_MAGIC:
         rc = mon->antimagic_susceptible();
         break;
@@ -6095,6 +6125,9 @@ bool ench_flavour_affects_monster(actor *agent, beam_type flavour,
         rc = mons_can_be_spectralised(*mon, true, true)
              && !mon->props.exists(SOUL_SPLINTERED_KEY);
         break;
+
+    case BEAM_BECKONING:
+        return can_beckon(*mon);
 
     default:
         break;
@@ -6395,11 +6428,11 @@ mon_resist_type bolt::apply_enchantment_to_monster(monster* mon)
         }
         return MON_AFFECTED;
 
-    case BEAM_DOUBLE_HEALTH:
-        if (!mon->has_ench(ENCH_DOUBLED_HEALTH)
-            && mon->add_ench(ENCH_DOUBLED_HEALTH))
+    case BEAM_DOUBLE_VIGOUR:
+        if (!mon->has_ench(ENCH_DOUBLED_VIGOUR)
+            && mon->add_ench(ENCH_DOUBLED_VIGOUR))
         {
-            if (simple_monster_message(*mon, " surges with doubled health!"))
+            if (simple_monster_message(*mon, " surges with doubled vitality!"))
                 obvious_effect = true;
         }
         return MON_AFFECTED;
@@ -6524,6 +6557,7 @@ mon_resist_type bolt::apply_enchantment_to_monster(monster* mon)
             mon->add_ench(mon_enchant(good, 0, agent()));
             if (!obvious_effect && could_see && !you.can_see(*mon))
                 obvious_effect = true;
+            check_lovelessness(*mon);
             return MON_AFFECTED;
         }
 
@@ -6665,6 +6699,11 @@ mon_resist_type bolt::apply_enchantment_to_monster(monster* mon)
                 obvious_effect = true;
             }
         }
+        return MON_AFFECTED;
+
+    case BEAM_DIMINISH_SPELLS:
+        mon->diminish(agent(), 9);
+        obvious_effect = true;
         return MON_AFFECTED;
 
     case BEAM_DRAIN_MAGIC:
@@ -7277,8 +7316,14 @@ void bolt::determine_affected_cells(explosion_map& m, const coord_def& delta,
         // Special case: explosion originates from rock/statue
         // (e.g. Lee's Rapid Deconstruction) - in this case, ignore
         // solid cells at the center of the explosion.
-        if (stop_at_walls && !(delta.origin() && can_affect_wall(loc)))
+        if (stop_at_walls && !(delta.origin() && can_affect_wall(loc))
+            // Also affect *other* wall monsters around the area, as long
+            // as caster still has LOS to them (i.e. they're not on the *other*
+            // side of the wall) which the later recursion loop will check
+            && !monster_at(loc))
+        {
             return;
+        }
         // But remember that we are at a wall.
         if (flavour != BEAM_DIGGING)
             at_wall = true;
@@ -7413,7 +7458,7 @@ bool bolt::nice_to(const monster_info& mi) const
 
     if (flavour == BEAM_HASTE
         || flavour == BEAM_HEALING
-        || flavour == BEAM_DOUBLE_HEALTH
+        || flavour == BEAM_DOUBLE_VIGOUR
         || flavour == BEAM_MIGHT
         || flavour == BEAM_AGILITY
         || flavour == BEAM_INVISIBILITY
@@ -7656,6 +7701,7 @@ static string _beam_type_name(beam_type type)
     case BEAM_AGILITY:               return "agility";
     case BEAM_SAP_MAGIC:             return "sap magic";
     case BEAM_DRAIN_MAGIC:           return "drain magic";
+    case BEAM_DIMINISH_SPELLS:       return "diminish spells";
     case BEAM_TUKIMAS_DANCE:         return "tukima's dance";
     case BEAM_DEATH_RATTLE:          return "breath of the dead";
     case BEAM_RESISTANCE:            return "resistance";
@@ -7682,7 +7728,7 @@ static string _beam_type_name(beam_type type)
     case BEAM_SHADOW_TORPOR:         return "shadow torpor";
     case BEAM_HAEMOCLASM:            return "gore";
     case BEAM_BLOODRITE:             return "blood";
-    case BEAM_DOUBLE_HEALTH:         return "health-doubling";
+    case BEAM_DOUBLE_VIGOUR:         return "vigour-doubling";
     case BEAM_VEX:                   return "vexing";
     case BEAM_SEISMIC:               return "seismic shockwave";
     case BEAM_BOLAS:                 return "entwining bolas";
@@ -7886,9 +7932,10 @@ void player_beam_tracer::monster_hit(const bolt& beam, const monster& mon)
     }
 }
 
-void player_beam_tracer::cancel() noexcept
+void player_beam_tracer::blocked(string message) noexcept
 {
-    cancelled = true;
+    blocked_message = std::move(message);
+    blocked_count++;
 }
 
 bool targeting_tracer::has_hit_foe() noexcept
@@ -7911,11 +7958,15 @@ void targeting_tracer::actor_affected(bool friendly_fire, int power) noexcept
 }
 
 // returns true if the player wishes to cancel firing the bolt, false otherwise
-bool cancel_beam_prompt(const bolt& beam,
-                                const player_beam_tracer& tracer)
+bool cancel_beam_prompt(const bolt& beam, const player_beam_tracer& tracer,
+                        int beams_fired)
 {
-    if (tracer.cancelled)
+    ASSERT(beams_fired >= tracer.blocked_count);
+    if (tracer.blocked_count >= beams_fired)
+    {
+        mpr(tracer.blocked_message);
         return true;
+    }
 
     const spell_type spell = beam.origin_spell;
 

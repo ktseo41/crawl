@@ -368,7 +368,7 @@ static const mon_spellbook mspell_list[] =
     // ('m') Merfolk and friends.
     {  MST_MERFOLK_SIREN,
       {
-       { SPELL_SIREN_SONG, 160, MON_SPELL_WIZARD },
+       { SPELL_SIREN_SONG, 80, MON_SPELL_WIZARD },
       }
     },
 
@@ -380,7 +380,7 @@ static const mon_spellbook mspell_list[] =
 
     {  MST_MERFOLK_AVATAR,
       {
-       { SPELL_AVATAR_SONG, 160, MON_SPELL_WIZARD },
+       { SPELL_AVATAR_SONG, 80, MON_SPELL_WIZARD },
       }
     },
 
@@ -670,6 +670,12 @@ static const mon_spellbook mspell_list[] =
       }
     },
 
+    {  MST_MOUNTAINSHELL,
+      {
+       { SPELL_SEISMIC_STOMP, 60, MON_SPELL_NATURAL },
+      }
+    },
+
     // ('v') Vortices.
     {  MST_THERMIC_DYNAMO,
       {
@@ -871,6 +877,12 @@ static const mon_spellbook mspell_list[] =
       }
     },
 
+    {  MST_CLOCKROACH,
+      {
+       { SPELL_SANDBLAST, 30, MON_SPELL_MAGICAL},
+      }
+    },
+
     {  MST_RADROACH,
       {
        { SPELL_IRRADIATE, 50, MON_SPELL_NATURAL},
@@ -998,6 +1010,12 @@ static const mon_spellbook mspell_list[] =
                                   | MON_SPELL_NOISY },
        { SPELL_POISONOUS_CLOUD, 23, MON_SPELL_NATURAL | MON_SPELL_BREATH
                                   | MON_SPELL_NOISY },
+      }
+    },
+
+    {  MST_BONE_DRAGON,
+      {
+       { SPELL_MARCH_OF_SORROWS, 59, MON_SPELL_NATURAL | MON_SPELL_NOISY },
       }
     },
 
@@ -1169,6 +1187,12 @@ static const mon_spellbook mspell_list[] =
        { SPELL_CANTRIP, 19, MON_SPELL_WIZARD },
        { SPELL_SUMMON_MINOR_DEMON, 19, MON_SPELL_WIZARD },
        { SPELL_SUMMON_DEMON, 19, MON_SPELL_WIZARD },
+      }
+    },
+
+    {  MST_KOBOLD_GEOMANCER,
+      {
+       { SPELL_LRD, 32, MON_SPELL_WIZARD },
       }
     },
 
@@ -1513,6 +1537,12 @@ static const mon_spellbook mspell_list[] =
     },
 
     // ('W') Incorporeal undead.
+    {  MST_BES_KEMWAR,
+      {
+       { SPELL_DIMINISH_SPELLS, 33, MON_SPELL_NATURAL },
+      }
+    },
+
     {  MST_SHADOWGHAST,
       {
        { SPELL_INVISIBILITY, 33, MON_SPELL_NATURAL },
@@ -1664,7 +1694,7 @@ static const mon_spellbook mspell_list[] =
        { SPELL_BOLT_OF_COLD, 16, MON_SPELL_MAGICAL },
        { SPELL_LIGHTNING_BOLT, 16, MON_SPELL_MAGICAL },
        { SPELL_FREEZING_CLOUD, 16, MON_SPELL_MAGICAL },
-       { SPELL_AIRSTRIKE, 16, MON_SPELL_MAGICAL },
+       { SPELL_SLEETSTRIKE, 16, MON_SPELL_MAGICAL },
       }
     },
 
@@ -1832,6 +1862,12 @@ static const mon_spellbook mspell_list[] =
     {  MST_NARGUN,
       {
        { SPELL_PETRIFY, 66, MON_SPELL_NATURAL },
+      }
+    },
+
+    {  MST_UNDERTAKER,
+      {
+       { SPELL_BORGNJORS_VILE_CLUTCH, 36, MON_SPELL_MAGICAL  | MON_SPELL_LONG_RANGE },
       }
     },
 
@@ -2476,12 +2512,11 @@ static const mon_spellbook mspell_list[] =
       }
     },
 
-    {  MST_PSYCHE,
+    {  MST_CASSANDRA,
       {
-       { SPELL_CANTRIP, 12, MON_SPELL_WIZARD },
-       { SPELL_POLYMORPH, 12, MON_SPELL_WIZARD },
-       { SPELL_CHAIN_OF_CHAOS, 24, MON_SPELL_WIZARD },
-       { SPELL_INVISIBILITY, 12, MON_SPELL_WIZARD },
+       { SPELL_DOOMSAYING, 200, MON_SPELL_NATURAL },
+       { SPELL_DOOM_BOLT, 34, MON_SPELL_WIZARD },
+       { SPELL_SWIFTNESS, 24, MON_SPELL_WIZARD },
       }
     },
     // ('&', mostly) Demon lords.
@@ -2495,14 +2530,14 @@ static const mon_spellbook mspell_list[] =
       {
        { SPELL_BOLT_OF_FIRE, 22, MON_SPELL_MAGICAL },
        { SPELL_HURL_DAMNATION, 22, MON_SPELL_MAGICAL },
-       { SPELL_FIRE_SUMMON, 22, MON_SPELL_MAGICAL },
+       { SPELL_HELLFIRE_COURT, 22, MON_SPELL_MAGICAL },
       }
     },
 
     {  MST_ANTAEUS,
       {
        { SPELL_LIGHTNING_BOLT, 24, MON_SPELL_MAGICAL },
-       { SPELL_FLASH_FREEZE, 48, MON_SPELL_MAGICAL },
+       { SPELL_SLEETSTRIKE, 36, MON_SPELL_MAGICAL },
       }
     },
 
@@ -2550,7 +2585,7 @@ static const mon_spellbook mspell_list[] =
       {
        { SPELL_IRON_SHOT, 11, MON_SPELL_MAGICAL },
        { SPELL_FIRE_STORM, 11, MON_SPELL_MAGICAL },
-       { SPELL_FIRE_SUMMON, 11, MON_SPELL_MAGICAL },
+       { SPELL_HELLFIRE_COURT, 11, MON_SPELL_MAGICAL },
        { SPELL_HASTE, 36, MON_SPELL_MAGICAL },
       }
     },

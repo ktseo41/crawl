@@ -2180,8 +2180,7 @@ int Menu::get_first_visible(bool skip_init_headers, int col) const
 
 bool Menu::is_hotkey(int i, int key)
 {
-    bool ishotkey = items[i]->is_hotkey(key);
-    return ishotkey && (!is_set(MF_SELECT_BY_PAGE) || in_page(i));
+    return items[i]->is_hotkey(key);
 }
 
 /// find the first item (if any) that has hotkey `key`.
@@ -2192,39 +2191,67 @@ int Menu::hotkey_to_index(int key, bool primary_only)
     // Process all items, in case user hits hotkey for an
     // item not on the current page.
 
-    // We first check for the first matching hotkey, starting from the top of
+    // Depending on flags, we have one of two behaviors:
+    //
+    // If MF_SELECT_BY_CATEGORY is set (used for single-page inventory screen),
+    // we first check for the first matching hotkey, starting from the top of
     // the current menu subsection the cursor is in. If no match is found, we
     // next check from the start of the menu to the current position. (This
     // means that in cases where a menu has multiple entries with the same
     // letter, we will select one within the current subsection, if one exists,
     // and then check elsewhere if not.)
+    //
+    // If it is not, we simply select the nearest entry with a matching hotkey.
 
-    // First, determine the top of our current section.
-    int top = 0;
-    for (int i = last_hovered; i >= 0; --i)
+    if (is_set(MF_SELECT_BY_CATEGORY))
     {
-        if (items[i]->level != MEL_ITEM)
+        // First, determine the top of our current section.
+        int top = 0;
+        for (int i = last_hovered; i >= 0; --i)
         {
-            top = i;
-            break;
+            if (items[i]->level != MEL_ITEM)
+            {
+                top = i;
+                break;
+            }
+        }
+
+        for (int i = top; i < final; ++i)
+        {
+            if (is_hotkey(i, key)
+                && (!primary_only || items[i]->hotkeys[0] == key))
+            {
+                return i;
+            }
+        }
+        for (int i = 0; i < top; ++i)
+        {
+            if (is_hotkey(i, key)
+                && (!primary_only || items[i]->hotkeys[0] == key))
+            {
+                return i;
+            }
         }
     }
+    else
+    {
+        int nearest_index = -1;
+        int nearest_dist = INT_MAX;
+        for (int i = 0; i < (int)items.size(); ++i)
+        {
+            if (is_hotkey(i, key)
+                && (!primary_only || items[i]->hotkeys[0] == key))
+            {
+                int dist = abs(i - last_hovered);
+                if (dist < nearest_dist)
+                {
+                    nearest_dist = dist;
+                    nearest_index = i;
+                }
+            }
+        }
 
-    for (int i = top; i < final; ++i)
-    {
-        if (is_hotkey(i, key)
-            && (!primary_only || items[i]->hotkeys[0] == key))
-        {
-            return i;
-        }
-    }
-    for (int i = 0; i < top; ++i)
-    {
-        if (is_hotkey(i, key)
-            && (!primary_only || items[i]->hotkeys[0] == key))
-        {
-            return i;
-        }
+        return nearest_index;
     }
 
     return -1;
@@ -2426,13 +2453,7 @@ bool MonsterMenuEntry::get_tiles(vector<tile_def>& tileset) const
     tileidx_t       ch = TILE_FLOOR_NORMAL;
 
     if (!fake)
-    {
         ch = tileidx_feature(c);
-        if (ch == TILE_FLOOR_NORMAL)
-            ch = tile_env.flv(c).floor;
-        else if (ch == TILE_WALL_NORMAL)
-            ch = tile_env.flv(c).wall;
-    }
 
     tileset.emplace_back(ch);
 
@@ -2518,7 +2539,7 @@ bool MonsterMenuEntry::get_tiles(vector<tile_def>& tileset) const
     }
 
     // A fake monster might not have its ghost member set up properly.
-    if (!fake && m->ground_level())
+    if (!fake && !m->airborne())
     {
         if (ch == TILE_DNGN_LAVA)
             tileset.emplace_back(TILEI_MASK_LAVA);

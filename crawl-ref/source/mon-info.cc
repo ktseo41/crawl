@@ -141,7 +141,7 @@ static map<enchant_type, monster_info_flags> trivial_ench_mb_mappings = {
     { ENCH_RIMEBLIGHT,      MB_RIMEBLIGHT },
     { ENCH_ARMED,           MB_ARMED },
     { ENCH_SHADOWLESS,      MB_SHADOWLESS },
-    { ENCH_DOUBLED_HEALTH,  MB_DOUBLED_HEALTH },
+    { ENCH_DOUBLED_VIGOUR,  MB_DOUBLED_VIGOUR },
     { ENCH_KINETIC_GRAPNEL, MB_KINETIC_GRAPNEL },
     { ENCH_TEMPERED,        MB_TEMPERED },
     { ENCH_BLINKITIS,       MB_BLINKITIS },
@@ -207,8 +207,11 @@ static monster_info_flags ench_to_mb(const monster& mons, enchant_type ench)
     case ENCH_CONTAM:
         return mons.get_ench(ench).degree == 1 ? MB_CONTAM_LIGHT : MB_CONTAM_HEAVY;
     case ENCH_SLOWLY_DYING:
-        if (mons.type == MONS_WITHERED_PLANT)
+        if (mons.type == MONS_WITHERED_PLANT ||
+            mons.type == MONS_PILE_OF_DEBRIS)
+        {
             return MB_CRUMBLING;
+        }
         if (mons_class_is_fragile(mons.type))
             return MB_WITHERING;
         return MB_SLOWLY_DYING;
@@ -378,13 +381,8 @@ monster_info::monster_info(monster_type p_type, monster_type p_base_type)
 
     if (mons_is_unique(type))
     {
-        if (type == MONS_LERNAEAN_HYDRA
-            || type == MONS_ROYAL_JELLY
-            || mons_species(type) == MONS_SERPENT_OF_HELL
-            || type == MONS_ENCHANTRESS)
-        {
+        if (mons_is_the(type))
             mb.set(MB_NAME_THE);
-        }
         else
         {
             mb.set(MB_NAME_UNQUALIFIED);
@@ -504,13 +502,8 @@ monster_info::monster_info(const monster* m, int milev)
 
     if (mons_is_unique(type))
     {
-        if (type == MONS_LERNAEAN_HYDRA
-            || type == MONS_ROYAL_JELLY
-            || mons_species(type) == MONS_SERPENT_OF_HELL
-            || type == MONS_ENCHANTRESS)
-        {
+        if (mons_is_the(type))
             mb.set(MB_NAME_THE);
-        }
         else
         {
             mb.set(MB_NAME_UNQUALIFIED);
@@ -669,7 +662,7 @@ monster_info::monster_info(const monster* m, int milev)
     }
 
     // Similarly, don't set invisibility stab UI for firewood.
-    if (!you.visible_to(m) && !m->is_firewood())
+    if (!you.visible_to(m) && !m->is_firewood() && !m->has_ench(ENCH_BLIND))
         mb.set(MB_CANT_SEE_YOU);
 
     if (type == MONS_SILENT_SPECTRE)
@@ -1029,14 +1022,6 @@ string monster_info::_core_name() const
 
     if (is(MB_NAME_REPLACE))
         s = mname;
-    else if (nametype == MONS_LERNAEAN_HYDRA)
-        s = "Lernaean hydra"; // TODO: put this into mon-data.h
-    else if (nametype == MONS_ROYAL_JELLY)
-        s = "Royal Jelly";
-    else if (mons_species(nametype) == MONS_SERPENT_OF_HELL)
-        s = "Serpent of Hell";
-    else if (nametype == MONS_ENCHANTRESS)
-        s = "Enchantress";
     else if (invalid_monster_type(nametype) && nametype != MONS_PROGRAM_BUG)
         s = "INVALID MONSTER";
     else
@@ -1531,9 +1516,11 @@ vector<string> monster_info::attributes() const
 
     if (type == MONS_NAMELESS_REVENANT)
     {
-        const int num_memories = props[NOBODY_MEMORIES_KEY].get_vector().size();
+        const int num_memories = props.exists(NOBODY_MEMORIES_KEY)
+                                    ? props[NOBODY_MEMORIES_KEY].get_vector().size()
+                                    : NOBODY_MAX_MEMORIES;
         v.push_back(make_stringf("%d %s left", num_memories,
-                                               num_memories > 1 ? "memories" : "memory"));
+                                               num_memories == 1 ? "memory" : "memories"));
     }
 
     return v;
@@ -1732,7 +1719,7 @@ int monster_info::range() const
     const item_def *wand = inv[MSLOT_WAND].get();
     if (wand && is_offensive_wand(*wand)) {
         const spell_type spell = spell_in_wand(static_cast<wand_type>(wand->sub_type));
-        range = max(range, calc_spell_range(spell, spell_power_cap(spell), true, true));
+        range = max(range, calc_spell_range(spell, spell_power_cap(spell), false, true));
     }
     return range;
 }
@@ -1794,7 +1781,7 @@ bool monster_info::net_immune() const
            && mons_class_is_stationary(base_type);
 }
 
-bool monster_info::cannot_move() const
+bool monster_info::cannot_act() const
 {
     return is(MB_PARALYSED) || is(MB_PETRIFIED);
 }
@@ -1808,7 +1795,7 @@ bool monster_info::asleep() const
 bool monster_info::incapacitated() const
 {
     // Duplicates actor::incapacitated
-    return cannot_move()
+    return cannot_act()
             || asleep()
             || is(MB_CONFUSED)
             || is(MB_CAUGHT);
@@ -1817,11 +1804,6 @@ bool monster_info::incapacitated() const
 bool monster_info::airborne() const
 {
     return is(MB_AIRBORNE);
-}
-
-bool monster_info::ground_level() const
-{
-    return !airborne();
 }
 
 bool monster_info::fellow_slime() const {
@@ -2225,4 +2207,10 @@ monster* monster_info::get_known_summoner() const
         return nullptr;
 
     return summoner;
+}
+
+
+bool monster_info::is_stationary() const
+{
+    return mons_class_is_stationary(type);
 }

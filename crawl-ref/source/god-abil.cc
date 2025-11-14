@@ -117,13 +117,21 @@ static bool _player_sacrificed_arcana();
 // Load the sacrifice_def definition and the sac_data array.
 #include "sacrifice-data.h"
 
+/**
+* What piety rank do you need to unlock your capstone?
+*/
+int capstone_piety_rank(god_type god)
+{
+    // Worshippers of Ignis can use their capstone with any amount of piety
+    return (god == GOD_IGNIS) ? -1 : 6;
+}
+
 /** Would a god currently allow using a one-time six-star ability?
  * Does not check whether the god actually grants such an ability.
  */
 bool can_do_capstone_ability(god_type god)
 {
-    // Worshippers of Ignis can use their capstone with any amount of piety
-    int pbreak = (god == GOD_IGNIS) ? -1 : 5;
+    int pbreak = capstone_piety_rank(god) - 1;
     return in_good_standing(god, pbreak) && !you.one_time_ability_used[god];
 }
 
@@ -245,10 +253,8 @@ bool bless_weapon(god_type god, brand_type brand, colour_t colour)
                 maybe_bloodify_square(*ri);
     }
 
-#ifndef USE_TILE_LOCAL
     // Allow extra time for the flash to linger.
     scaled_delay(1000);
-#endif
     return true;
 }
 
@@ -1308,10 +1314,8 @@ void zin_sanctuary()
         mpr("You are suddenly bathed in radiance!");
 
     flash_view(UA_PLAYER, WHITE);
-#ifndef USE_TILE_LOCAL
     // Allow extra time for the flash to linger.
     scaled_delay(1000);
-#endif
 
     // Pets stop attacking and converge on you.
     you.pet_target = MHITYOU;
@@ -1781,7 +1785,7 @@ void yred_make_bound_soul(monster* mon, bool force_hostile)
     }
 
     // schedule our actual revival for the end of this combat round
-    avoided_death_fineff::schedule(mon);
+    schedule_avoided_death_fineff(mon);
 
     mprf("%s soul %s.", whose.c_str(),
          !force_hostile ? "is now yours" : "fights you");
@@ -1820,10 +1824,8 @@ bool kiku_gift_capstone_spells()
     simple_god_message(" grants you forbidden knowledge!");
     library_add_spells(spells);
     flash_view(UA_PLAYER, RED);
-#ifndef USE_TILE_LOCAL
     // Allow extra time for the flash to linger.
     scaled_delay(1000);
-#endif
     more();
     you.one_time_ability_used.set(you.religion);
     take_note(Note(NOTE_GOD_GIFT, you.religion, 0, "forbidden knowledge"));
@@ -2080,10 +2082,8 @@ void cheibriados_time_step(int pow)
         // Update corpses, etc.
         update_level(1000);
 
-#ifndef USE_TILE_LOCAL
+        // Allow extra time for the flash to linger.
         scaled_delay(1000);
-#endif
-
     }
     _cleanup_time_steps();
 
@@ -2294,7 +2294,9 @@ static void _choose_curse_knowledge()
 void ashenzari_offer_new_curse()
 {
     // No curse at full piety, since shattering resets the curse timer anyway
-    if (piety_rank() > 5)
+    // Check raw piety rather than effective piety, since we don't want to
+    // offer curses while ostracised from full piety.
+    if (piety_rank(you.raw_piety) > 5)
         return;
 
     _choose_curse_knowledge();
@@ -2468,10 +2470,10 @@ void announce_beogh_conversion_offer()
             mons_speaks_msg(m, getSpeakString("orc_priest_preaching"),
                             MSGCH_TALK);
 
-            ASSERT_RANGE(get_talent(ABIL_CONVERT_TO_BEOGH, false).hotkey,
+            ASSERT_RANGE(get_talent(ABIL_CONVERT_TO_BEOGH).hotkey,
                             'A', 'z' + 1);
             mprf("(press <w>%c</w> on the <w>%s</w>bility menu to convert to Beogh)",
-                    get_talent(ABIL_CONVERT_TO_BEOGH, false).hotkey,
+                    get_talent(ABIL_CONVERT_TO_BEOGH).hotkey,
                     command_to_string(CMD_USE_ABILITY).c_str());
             you.attribute[ATTR_SEEN_BEOGH] = 1;
 
@@ -2813,49 +2815,7 @@ void beogh_increase_orcification()
     }
 
     // Adjust the message we give to the player's physiology.
-    string msg;
-    switch (you.species)
-    {
-        case SP_FORMICID:
-            msg += "Your mandibles take on a glossy white sheen, and your antennae grow pointier.";
-            break;
-
-        case SP_TENGU:
-            msg += "Your beak becomes more hooked, and the plumage around your ears grows tufted.";
-            break;
-
-        case SP_GARGOYLE:
-            msg += "You feel a divine power chisel tusks from your teeth and sculpt your ears to a sharp point.";
-            break;
-
-        case SP_VINE_STALKER:
-            msg += "A pair of ivory tusks grows out from your maw, and flowers begin to bloom upon you.";
-            break;
-
-        case SP_MUMMY:
-            msg += "A small pair of tusks begins to pierce through your wrappings.";
-            break;
-
-        case SP_POLTERGEIST:
-            msg += "A small pair of spectral tusks begins to grow in your mouth.";
-            break;
-
-        case SP_REVENANT:
-            msg += "A small pair of tusks begins to sprout from your jawbone.";
-            break;
-
-        case SP_BARACHI:
-            msg += "Your teeth grow more tusk-like, and your tympanum bulges.";
-            break;
-
-        case SP_OCTOPODE:
-            msg += "Your beak grows more hooked, and small fins emerge from the sides of your head.";
-            break;
-
-        default:
-            msg += "Your teeth grow more tusk-like, and your ears lengthen.";
-            break;
-    }
+    string msg = species::orcification_msg(you.species);
 
     mprf(MSGCH_MUTATION, "%s", msg.c_str());
     you.props[ORCIFICATION_LEVEL_KEY] = 1;
@@ -3464,18 +3424,14 @@ bool gozag_setup_call_merchant(bool quiet)
     if (!is_connected_branch(level_id::current().branch))
     {
         if (!quiet)
-        {
             mpr("No merchants are willing to come to this location.");
-            return false;
-        }
+        return false;
     }
     if (env.grid(you.pos()) != DNGN_FLOOR)
     {
         if (!quiet)
-        {
             mpr("You need to be standing on open floor to call a merchant.");
-            return false;
-        }
+        return false;
     }
 
     return true;
@@ -3988,7 +3944,7 @@ spret qazlal_upheaval(coord_def target, bool quiet, bool fail, dist *player_targ
         if (!spell_direction(*player_target, beam, &args))
             return spret::abort;
 
-        if (cell_is_solid(beam.target))
+        if (cell_is_invalid_target(beam.target))
         {
             mprf("There is %s there.",
                  article_a(feat_type_name(env.grid(beam.target))).c_str());
@@ -4055,7 +4011,7 @@ spret qazlal_upheaval(coord_def target, bool quiet, bool fail, dist *player_targ
     for (radius_iterator ri(beam.target, max_radius, C_SQUARE, LOS_SOLID, true);
          ri; ++ri)
     {
-        if (!in_bounds(*ri) || cell_is_solid(*ri))
+        if (!in_bounds(*ri) || cell_is_invalid_target(*ri))
             continue;
 
         if (!_qazlal_affected(*ri))
@@ -4113,7 +4069,7 @@ spret qazlal_upheaval(coord_def target, bool quiet, bool fail, dist *player_targ
                 }
                 break;
             case BEAM_AIR:
-                if (!cell_is_solid(pos) && !cloud_at(pos) && coinflip())
+                if (coinflip())
                 {
                     place_cloud(CLOUD_STORM, pos,
                                 random2(you.skill_rdiv(SK_INVOCATIONS, 1, 4)),
@@ -4217,7 +4173,7 @@ spret qazlal_disaster_area(bool fail)
     for (radius_iterator ri(you.pos(), LOS_RADIUS, C_SQUARE, LOS_NO_TRANS, true);
          ri; ++ri)
     {
-        if (!in_bounds(*ri) || cell_is_solid(*ri))
+        if (!in_bounds(*ri) || cell_is_invalid_target(*ri))
             continue;
 
         if (!_qazlal_affected(*ri))
@@ -5990,7 +5946,7 @@ spret uskayaw_grand_finale(bool fail)
         // need to do this here, because react_to_damage is never called
         mprf("%s explodes violently into a cloud of jellies%s",
                                         mons->name(DESC_THE, false).c_str(), attack_punctuation.c_str());
-        trj_spawn_fineff::schedule(&you, mons, mons->pos(), mons->hit_points);
+        schedule_trj_spawn_fineff(&you, mons, mons->pos(), mons->hit_points);
     }
     else
         mprf("%s explodes violently%s", mons->name(DESC_THE, false).c_str(), attack_punctuation.c_str());
@@ -6258,8 +6214,8 @@ spret hepliaklqana_transference(bool fail)
          victim->is_player() ? "" : "s",
          ancestor->name(DESC_YOUR).c_str());
 
-    check_place_cloud(CLOUD_MIST, target, random_range(10,20), ancestor);
-    check_place_cloud(CLOUD_MIST, destination, random_range(10,20), ancestor);
+    place_cloud(CLOUD_MIST, target, random_range(10,20), ancestor);
+    place_cloud(CLOUD_MIST, destination, random_range(10,20), ancestor);
 
     if (victim->is_monster())
         mons_relocated(victim->as_monster());
@@ -6588,8 +6544,7 @@ void wu_jian_heavenly_storm()
                          "keep fighting, disciple!");
 
     for (radius_iterator ai(you.pos(), 2, C_SQUARE, LOS_SOLID); ai; ++ai)
-        if (!cell_is_solid(*ai))
-            place_cloud(CLOUD_GOLD_DUST, *ai, 5 + random2(5), &you);
+        place_cloud(CLOUD_GOLD_DUST, *ai, 5 + random2(5), &you);
 
     you.set_duration(DUR_HEAVENLY_STORM, random_range(2, 3));
     you.props[WU_JIAN_HEAVENLY_STORM_KEY] = WU_JIAN_HEAVENLY_STORM_INITIAL;
@@ -7299,8 +7254,8 @@ static void _spawn_crucible_demon(bool allow_in_sight)
 {
     int pow = (you.experience_level - 7) * 5 / 4;
 
-    if (runes_in_pack() > 3)
-        pow += (runes_in_pack() - 3) * 2 / 3;
+    if (runes_in_pack() > ZOT_ENTRY_RUNES)
+        pow += (runes_in_pack() - ZOT_ENTRY_RUNES) * 2 / 3;
 
     if (coinflip())
         pow = pow * 2 / 3;
@@ -7400,8 +7355,8 @@ void makhleb_enter_crucible_of_flesh(int debt)
     for (int i = 0; i < num_victims; ++i)
         _spawn_crucible_victim(true);
 
-    simple_god_message(" says \"Flay and bleed and purify yourself, if you wish"
-                       " to be found worthy of leaving this place!\"", false,
+    simple_god_message(" says: Flay and bleed and purify yourself, if you wish"
+                       " to be found worthy of leaving this place!", false,
                        GOD_MAKHLEB);
 
     mpr("(Slaughtering mortal victims (and sometimes even demons) will "

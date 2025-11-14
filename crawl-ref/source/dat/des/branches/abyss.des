@@ -71,11 +71,13 @@ ENDMAP
 
 NAME:    abyss_entry_small_statue_room
 TAGS:    nolayout_encompass
+SUBST:   c : cx
+: tile("c = " .. crackle_def(_G))
 : abyss_entry(_G, 'O')
 MAP
-xxxxx
+cxxxc
 xGOGx
-xx+xx
+cx+xc
 ENDMAP
 
 NAME:    abyss_entry_crystal
@@ -122,12 +124,8 @@ NAME:    abyss_entry_flame_altar
 TAGS:    nolayout_encompass
 : abyss_entry(_G, 'O')
 SUBST:   A : deG
-MARKER:  d = lua:fog_machine { cloud_type = "flame", \
-             pow_min = 10, pow_max = 10, delay = 10, \
-             size = 1, walk_dist = 0, spread_rate= 0, excl_rad = 0 }
-MARKER:  e = lua:fog_machine { cloud_type = "seething chaos", \
-             pow_min = 10, pow_max = 10, delay = 10, \
-             size = 1, walk_dist = 0, spread_rate= 0, excl_rad = 0 }
+: single_cloud(_G, "d", "flame", false)
+: single_cloud(_G, "e", "seething chaos", true)
 KFEAT:   _ = altar_lugonu
 MAP
  bbb
@@ -170,18 +168,20 @@ MONS:   occultist, occultist ; robe . dagger ego:distortion / orc wizard
 MONS:   deep elf demonologist / deep elf sorcerer w:5
 : mons("deep elf demonologist ; robe . " .. elfgear .. " / " ..
 :      "deep elf sorcerer w:5 ; robe . " .. elfgear)
-NSUBST: 1 = 1:1 / 1 = 1:90 2 / 1 = 3:90 4 / *:.
+NSUBST: 1 = 1:1 / 1 = 1:90 2 / 1 = 3:90 4 / *:'
 : abyss_entry(_G, 'O')
+FTILE:  " = floor_pebble_blue
+FTILE:  '1234O : floor_mystic_chasm / floor_pebble_blue
 MAP
    ......
   ..bbbb..
- ..b....b..
-..b......b..
-.b..bb1..b...
-...b.1O1.b...
-...b..1bb..b.
- ..b......b..
-  ..b....b..
+ ..b''''b..
+..b''''''b..
+.b''bb1''b...
+.""b'1O1'b"".
+...b''1bb''b.
+ ..b''''''b..
+  ..b''''b..
    ..bbbb..
     ......
 ENDMAP
@@ -220,26 +220,63 @@ SUBST:   - : xc++., 0 = 123, D : x.., E : x..
 SHUFFLE: AO
 : vault_metal_statue_setup(_G, "G", "dimensional conduit")
 : abyss_entry(_G, 'O')
+FTILE:   .123AO+G : floor_mystic_chasm / floor_grey_dirt_b
 MAP
-    x...@..xx..
-   xxx....xx....@
-  xx.xx..cc......
- xx...xx++........
+    x'''@''xx''
+   xxx....xx..''@
+  xx.xx..cc....''
+ xx...xx++......''
 xx..D..+-+..E...xxx
-.x.....++xx....xxAx
-..x...cc..x...xx0.x
- ..x.xx...xx.xx1..x
- @..xx..G..xxx....x
-   .x2.....+.....3x.
-    x....xxx..G..xx..@
-    x..1xx.xx...xx.x..
-    x.0xx...x..cc...x..
-    xOxx....xx++.....x.
+'x.....++xx....xxAx
+''x...cc..x...xx0.x
+ ''x.xx...xx.xx1..x
+ @''xx..G..xxx....x
+   'x2.....+.....3x'
+    x....xxx..G..xx''@
+    x..1xx.xx...xx.x''
+    x.0xx...x..cc...x''
+    xOxx....xx++.....x'
     xxx...E..+-+..D..xx
-     ........++xx...xx
-      ......cc..xx.xx
-      @....xx....xxx
-        ..xx..@...x
+     ''......++xx...xx
+      ''....cc..xx.xx
+      @''..xx....xxx
+        ''xx''@'''x
+ENDMAP
+
+NAME:    regret_index_abyss_entry_lash
+TAGS:    transparent nolayout_encompass
+MONS:    rakshasa / occultist / very ugly thing / \
+         kobold fleshcrafter w:4 / glass eye w:2
+MONS:    tentacled monstrosity / lich / \
+         chonchon w:4 / storm dragon simulacrum w:2
+KFEAT:   y = c
+KFEAT:   z = x
+SHUFFLE: AB / CD, IJKLM, 0G / 0G / G0
+SUBST:   A : "zzz, B : cybb, CD = ', IJ : xcc, K : x`, LM = .
+NSUBST:  0 = 1:2 / *:1
+FTILE:   '12OG : floor_mystic_chasm / floor_grey_dirt_b
+FTILE:   " : floor_nerves_blue / floor_nerves_magenta
+TILE:    b : dngn_crystal_blue / dngn_crystal_magenta
+: tile("y = " .. crackle_def(_G))
+TILE:    z = wall_abyss_blue
+: abyss_entry(_G, 'O')
+CLEAR:   `
+MAP
+     J.   I   .J
+      J   I   J
+      J   I   J
+       J  .  J
+ K      . x .      K
+ .KK    xxxxx    KK.
+    K  xxx0xxx  K
+     .xxx'''xxx.
+    xxxx'ACB'xxxx
+LL.xxxx0'DOD'0xxxx.LL
+    xxxx'BCA'xxxx
+     .xxx'''xxx.
+    M  xx'x'xx  M
+ .MM    xx'xx    MM.
+ M       .x.       M
 ENDMAP
 
 ###############################################################################
@@ -629,7 +666,7 @@ ENDMAP
 NAME:    hangedman_glass_garden
 TAGS:    no_monster_gen no_pool_fixup decor extra
 DEPTH:   D, Depths, Abyss
-WEIGHT:  1
+WEIGHT:  5 (Abyss), 2
 MONS:    butterfly, plant, unseen horror, shadow wraith
 ITEM:    potion of invisibility pre_id q:2, spriggan skeleton
 SHUFFLE: 34GT, GTt
@@ -640,7 +677,8 @@ SUBST:   + = M, ' = x:5 c:2 v:1 b:1, " = ., % = %%***|
 SUBST:   AB : wwl, CD : wll
 NSUBST:  M : 1:+ / 2 = mmm+ / * = m:19 +:1
 : else
-SUBST:   M = m, 34'" = ., ABCD = W
+SUBST:   M = m, 3'" = ., 4 = F, ABCD = W
+:   decorative_floor(_G, 'F', "flower patch")
 : end
 MAP
    ''' '''
@@ -1386,26 +1424,27 @@ NSUBST:  0 = 1:0 / 1:9 / * = 09
 NSUBST:  X = 1:1 / 1:2 / 1:3 / * = 123"", Q = 1:6 / 1:7 / * = 67...
 SHUFFLE: 12, 45
 FTILE:   A123O = floor_crystal_squares
+FTILE:   .4567890O+ = floor_mystic_chasm
 COLOUR:  123O = lightmagenta
 MAP
-    ...
-   ..c....
+    ..'
+   '.c..'.
   ..cc0.c.
- ..ccc"......
+ '.ccc"..'..'
 ..cccccccccc..
-..0ccc.4cc.cc..
-..cc9+cc+...nc.
-."c.5.cc..X..c.
+'.0ccc.4cc.cc..
+..cc9+cc+...nc'
+'"c.5.cc..X..c.
 .ccc+ccc.XcX.c.
-.....Q.c..X8.c.
-..Q.A..cn...nc.
+.....Q.c..X8.c'
+'.Q.A..cn...nc.
 .....Q..ccOcc..
 .ccccc..8ccc".0
-.ccc"ccccc"cc..
+'ccc"ccccc"cc.'
 .ccc...0....cc.
-............c0.
-           .cc.
-           ....
+.'..'...'...c0.
+           'cc.
+           ...'
 ENDMAP
 
 NAME:   doesnt_abyss_rune_brain_food
@@ -1670,8 +1709,7 @@ KFEAT:   " = runelight
 SHUFFLE: HIJKL, MNOPQ
 SUBST:   HIMN = l, J : ll., KL = ., O : llP, PQ : xxxxb, c : ccv
 NSUBST:  ' = 1:4 / 1:8 / 1 = 22248 / 10 = 2216 / *:., d = 1:dddd. / *:.
-MARKER:  F = lua:fog_machine { cloud_type = "translocational energy", \
-             pow_max = 2, delay_min = 10, delay_max = 20, walk_dist = 0, size = 1 }
+: single_cloud(_G, "F", "translocational energy", true)
 FTILE:   AF3579_OG+ = floor_crystal_squares
 COLOUR:  F3579 = lightmagenta
 MAP
@@ -1743,7 +1781,8 @@ KFEAT:   A = stone_arch
 KFEAT:   " = runelight
 SHUFFLE: 12
 SUBST:   X = xxxxc, c = cccvb
-FTILE:   Ade456O = floor_crystal_squares
+FTILE:   Ade456O = floor_crystal
+FTILE:   .@12 = floor_crystal_squares
 COLOUR:  de456O = lightmagenta
 MAP
     .....  . X ".@
@@ -1786,9 +1825,10 @@ NSUBST:  . = 1:2 / *:., w = 2:G / *:w, W = 2:H / *:W
 COLOUR:  1 = lightmagenta
 COLOUR:  x = elven_brick
 FTILE:   -+U4680BDFO = floor_hall
-FTILE:   .t23579ACE = floor_grass
+FTILE:   .t23579ACE = floor_grass_dark
 FTILE:   a1 = floor_crystal_squares
 TILE:    x = wall_hall
+: tile("c = " .. crackle_def(_G))
 TILE:    t = dngn_demonic_tree_1 / dngn_demonic_tree_8 / \
              dngn_demonic_tree_9 / dngn_demonic_tree_16
 MAP

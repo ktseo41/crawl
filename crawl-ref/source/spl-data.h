@@ -121,7 +121,7 @@ static const struct spell_desc spelldata[] =
     spflag::dir_or_target | spflag::needs_tracer | spflag::monster,
     5,
     200,
-    4, 11, // capped at LOS, yet this 11 matters since range increases linearly
+    LOS_RADIUS, LOS_RADIUS,
     20,
     TILEG_LIGHTNING_BOLT,
 },
@@ -1997,14 +1997,14 @@ static const struct spell_desc spelldata[] =
 },
 
 {
-    SPELL_FIRE_SUMMON, "Fire Summon",
+    SPELL_HELLFIRE_COURT, "Hellfire Court",
     spschool::summoning | spschool::fire,
     spflag::monster | spflag::mons_abjure,
     8,
     0,
     -1, -1,
     0,
-    TILEG_FIRE_SUMMON,
+    TILEG_HELLFIRE_COURT,
 },
 
 {
@@ -2124,7 +2124,7 @@ static const struct spell_desc spelldata[] =
     spflag::target | spflag::not_self | spflag::monster,
     3,
     100,
-    2, LOS_RADIUS,
+    LOS_RADIUS, LOS_RADIUS,
     0,
     TILEG_BECKONING_GALE,
 },
@@ -2621,6 +2621,17 @@ static const struct spell_desc spelldata[] =
     -1, -1,
     0,
     TILEG_PHANTOM_MIRROR,
+},
+
+{
+    SPELL_DIMINISH_SPELLS, "Diminish Spells",
+    spschool::hexes,
+    spflag::dir_or_target | spflag::monster | spflag::needs_tracer,
+    3,
+    200,
+    LOS_RADIUS, LOS_RADIUS,
+    4,
+    TILEG_DIMINISH_SPELLS,
 },
 
 {
@@ -3835,7 +3846,7 @@ static const struct spell_desc spelldata[] =
     0,
     LOS_RADIUS, LOS_RADIUS,
     0,
-    TILEG_REGENERATION,
+    TILEG_MASS_REGENERATION,
 },
 
 {
@@ -4593,6 +4604,28 @@ static const struct spell_desc spelldata[] =
     -1, -1,
     0,
     TILEG_PASSAGE_OF_GOLUBRIA,
+},
+
+{
+    SPELL_DOOMSAYING, "Doomsaying",
+    spschool::none,
+    spflag::monster,
+    6,
+    200,
+    -1, -1,
+    0,
+    TILEG_ILL_OMEN,
+},
+
+{
+    SPELL_SLEETSTRIKE, "Sleetstrike",
+    spschool::air | spschool::ice,
+    spflag::target | spflag::not_self | spflag::destructive | spflag::monster,
+    5,
+    200,
+    LOS_RADIUS, LOS_RADIUS,
+    4,
+    TILEG_SLEETSTRIKE,
 },
 
 #if TAG_MAJOR_VERSION == 34

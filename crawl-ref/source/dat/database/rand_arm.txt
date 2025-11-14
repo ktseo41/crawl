@@ -180,6 +180,8 @@ Kraken
 
 Leogriff
 
+Nuckelavee
+
 Pooka
 
 Skiapode
@@ -396,7 +398,7 @@ Beauty
 
 Birdsong
 
-Brilliance
+Cleverness
 
 Contentment
 
@@ -504,6 +506,8 @@ Disguise
 
 Fashionability
 
+Fullness
+
 Grace
 
 Gravitas
@@ -519,8 +523,6 @@ Privacy
 Protective Custody
 
 Resilience
-
-Resonance
 
 Shadows and Fog
 
@@ -678,6 +680,8 @@ the Gusle
 
 the Harp
 
+the Kazoo
+
 the Kettle-Drum
 
 the Lute
@@ -737,7 +741,7 @@ Chill Winds
 
 Cloud Cover
 
-Dust Devil
+Dust Devils
 
 Howling Wind
 

@@ -264,8 +264,7 @@ bool apply_cloud_trail(const coord_def old_pos)
             auto cloud = static_cast<cloud_type>(
                 you.props[XOM_CLOUD_TRAIL_TYPE_KEY].get_int());
             ASSERT(cloud != CLOUD_NONE);
-            check_place_cloud(cloud, old_pos, random_range(3, 10), &you,
-                              0, -1);
+            place_cloud(cloud, old_pos, random_range(3, 10), &you, 0, -1);
             return true;
         }
     }
@@ -325,9 +324,7 @@ bool cancel_confused_move(bool stationary)
         }
         else
         {
-            string name = bad_mons->name(DESC_PLAIN);
-            if (starts_with(name, "the "))
-               name.erase(0, 4);
+            string name = remove_prepended_the(bad_mons->name(DESC_PLAIN));
             if (!starts_with(bad_adj, "your"))
                bad_adj = "the " + bad_adj;
             prompt += bad_adj + name + bad_suff;
@@ -555,9 +552,8 @@ bool prompt_descent_shortcut(dungeon_feature_type ftype)
 
 static coord_def _rampage_destination(coord_def move, monster* target)
 {
-    if (!you.unrand_equipped(UNRAND_SEVEN_LEAGUE_BOOTS))
-        return you.pos() + move;
-    const int dist = grid_distance(you.pos(), target->pos()) - 1;
+    const int dist = min(grid_distance(you.pos(), target->pos()) - 1,
+                         you.rampaging());
     return you.pos() + move * dist;
 }
 
@@ -743,6 +739,10 @@ static spret _rampage_forward(coord_def move)
     _clear_constriction_data();
     _mark_potential_pursuers(rampage_destination);
 
+    // Calculate rollpage distance travelled before the move; we don't want to
+    // count potential trap movement or floor transitions later.
+    const int distance_moved = (rampage_destination - old_pos).rdist();
+
     // stepped = true, we're flavouring this as movement, not a blink.
     move_player_to_grid(rampage_destination, true);
 
@@ -751,12 +751,12 @@ static spret _rampage_forward(coord_def move)
             || you.wizmode_teleported_into_rock);
 
     you.clear_far_engulf(false, true);
-    // No full-LOS stabbing.
+    // No full-LOS stabbing from seven-league.
     if (enhanced)
         behaviour_event(mon_target, ME_ALERT, &you, you.pos());
 
     // Lastly, apply post-move effects unhandled by move_player_to_grid().
-    apply_rampage_heal();
+    apply_rampage_heal(distance_moved);
     player_did_deliberate_movement(true);
     remove_ice_movement();
     you.clear_far_engulf(false, true);
@@ -797,6 +797,45 @@ static void _finalize_cancelled_rampage_move()
     // Rampaging prevents Wu Jian attacks, so we do not process them
     // here
     update_acrobat_status();
+}
+
+static void _handle_trying_to_move_into_unpassable_terrain(coord_def targ,
+                                                           bool digging)
+{
+    if (env.grid(targ) == DNGN_OPEN_SEA)
+        mpr("The ferocious winds and tides of the open sea thwart your progress.");
+    else if (env.grid(targ) == DNGN_LAVA_SEA)
+        mpr("The endless sea of lava is not a nice place.");
+    else if (feat_is_tree(env.grid(targ)) && you_worship(GOD_FEDHAS))
+    {
+        if (digging)
+            mpr("You cannot dig through the dense trees.");
+        else
+            mpr("You cannot walk through the dense trees.");
+    }
+    else if (env.grid(targ) == DNGN_MALIGN_GATEWAY)
+        mpr("The malign portal rejects you as you step towards it.");
+    // Why isn't the border permarock?
+    else if (digging && !in_bounds(targ))
+        mpr("This wall is too hard to dig through.");
+    else if (digging && env.grid(targ) == DNGN_SLIMY_WALL)
+        mpr("Trying to dig through that would dissolve your mandibles.");
+    else if (digging)
+        mpr("You can't dig through that.");
+    else if (you.current_vision == 0)
+        mpr("You feel something solid in that direction.");
+
+    // Show the player the wall they've just bumped into, if they can't see it.
+    if (you.current_vision == 0)
+    {
+        map_cell& knowledge = env.map_knowledge(targ);
+        if (!knowledge.mapped() || knowledge.changed())
+        {
+            dungeon_feature_type newfeat = env.grid(targ);
+            knowledge.set_feature(newfeat, env.grid_colours(targ), TRAP_UNASSIGNED);
+            set_terrain_mapped(targ);
+        }
+    }
 }
 
 // Called when the player moves by walking/running. Also calls attack
@@ -918,16 +957,14 @@ void move_player_action(coord_def move)
         }
     }
 
+    const bool was_digging = you.digging;
+
     const coord_def targ = you.pos() + move;
     // You can't walk out of bounds!
     if (!in_bounds(targ))
     {
-        // Why isn't the border permarock?
-        if (you.digging)
-        {
-            mpr("This wall is too hard to dig through.");
-            you.digging = false;
-        }
+        you.digging = false;
+        _handle_trying_to_move_into_unpassable_terrain(targ, was_digging);
         return;
     }
 
@@ -964,14 +1001,12 @@ void move_player_action(coord_def move)
     {
         if (feat_is_diggable(env.grid(targ)) && env.grid(targ) != DNGN_SLIMY_WALL)
             targ_pass = true;
-        else // moving or attacking ends dig
+        else
         {
+            // moving or attacking ends dig
             you.digging = false;
-            if (env.grid(targ) == DNGN_SLIMY_WALL)
-                mpr("Trying to dig through that would dissolve your mandibles.");
-            else if (feat_is_solid(env.grid(targ)))
-                mpr("You can't dig through that.");
-            else
+
+            if (!feat_is_solid(env.grid(targ)))
                 mpr("You retract your mandibles.");
         }
     }
@@ -1152,7 +1187,7 @@ void move_player_action(coord_def move)
             _mark_potential_pursuers(targ);
             move_player_to_grid(targ, true);
             if (rampaged)
-                apply_rampage_heal();
+                apply_rampage_heal(1);
             player_did_deliberate_movement();
             remove_ice_movement();
             you.clear_far_engulf(false, true);
@@ -1194,26 +1229,8 @@ void move_player_action(coord_def move)
         // No rampage check here, since you can't rampage at walls
         if (!you.is_motile())
             canned_msg(MSG_CANNOT_MOVE);
-        else if (env.grid(targ) == DNGN_OPEN_SEA)
-            mpr("The ferocious winds and tides of the open sea thwart your progress.");
-        else if (env.grid(targ) == DNGN_LAVA_SEA)
-            mpr("The endless sea of lava is not a nice place.");
-        else if (feat_is_tree(env.grid(targ)) && you_worship(GOD_FEDHAS))
-            mpr("You cannot walk through the dense trees.");
-        else if (!try_to_swap && env.grid(targ) == DNGN_MALIGN_GATEWAY)
-            mpr("The malign portal rejects you as you step towards it.");
-        // Show the player the wall they've just bumped into, if they can't see it.
-        else if (you.current_vision == 0)
-        {
-            mpr("You feel something solid in that direction.");
-            map_cell& knowledge = env.map_knowledge(targ);
-            if (!knowledge.mapped() || knowledge.changed())
-            {
-                dungeon_feature_type newfeat = env.grid(targ);
-                knowledge.set_feature(newfeat, env.grid_colours(targ), TRAP_UNASSIGNED);
-                set_terrain_mapped(targ);
-            }
-        }
+        else if (!try_to_swap)
+            _handle_trying_to_move_into_unpassable_terrain(targ, was_digging);
 
         stop_running();
         move.reset();

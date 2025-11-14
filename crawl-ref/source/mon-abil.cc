@@ -918,7 +918,7 @@ static void _weeping_skull_cloud_aura(monster* mons)
         place_cloud(CLOUD_MISERY, pos[i], random2(3) + 2, mons);
 }
 
-static void _seismosaurus_egg_hatch(monster* mons)
+void seismosaurus_egg_hatch(monster* mons)
 {
     mon_enchant hatch = mons->get_ench(ENCH_HATCHING);
     hatch.duration -= 1;
@@ -952,6 +952,7 @@ static void _seismosaurus_egg_hatch(monster* mons)
         // Immediately stomp if anything is in range
         mons->speed_increment = 80;
         try_mons_cast(*mons, SPELL_SEISMIC_STOMP);
+        queue_monster_for_action(mons);
 
         // Clean up range indicator
         for (distance_iterator di(mons->pos(), false, false, 4); di; ++di)
@@ -979,8 +980,7 @@ bool mon_special_ability(monster* mons)
 
     // Slime creatures can split while out of sight.
     if ((!mons->near_foe() || mons->asleep())
-         && mons->type != MONS_SLIME_CREATURE
-         && mons->type != MONS_SEISMOSAURUS_EGG)
+         && mons->type != MONS_SLIME_CREATURE)
     {
         return false;
     }
@@ -1023,12 +1023,9 @@ bool mon_special_ability(monster* mons)
                 continue;
             }
 
-            if (!cell_is_solid(targ->pos()))
-            {
-                mons->suicide();
-                used = true;
-                break;
-            }
+            mons->suicide();
+            used = true;
+            break;
         }
         break;
 
@@ -1054,12 +1051,9 @@ bool mon_special_ability(monster* mons)
                 continue;
             }
 
-            if (!cell_is_solid(targ->pos()))
-            {
-                seeker_attack(*mons, **targ);
-                used = true;
-                break;
-            }
+            seeker_attack(*mons, **targ);
+            used = true;
+            break;
         }
         break;
 
@@ -1195,14 +1189,6 @@ bool mon_special_ability(monster* mons)
         _weeping_skull_cloud_aura(mons);
         break;
 
-    case MONS_SEISMOSAURUS_EGG:
-        if (egg_is_incubating(*mons))
-        {
-            _seismosaurus_egg_hatch(mons);
-            used = true;
-        }
-        break;
-
     case MONS_CLOCKWORK_BEE_INACTIVE:
     {
         // Note: the player is not a monster, so this will never happen to them.
@@ -1220,18 +1206,11 @@ bool mon_special_ability(monster* mons)
         // If we are engaging the player and have full memories, burn one fairly
         // immediately.
         if (mons->foe == MHITYOU && mons->can_see(you)
-            && mons->props[NOBODY_MEMORIES_KEY].get_vector().size() == 3
+            && mons->props[NOBODY_MEMORIES_KEY].get_vector().size() == NOBODY_MAX_MEMORIES
             && one_chance_in(3))
         {
             pyrrhic_recollection(*mons);
             used = true;
-        }
-
-        // If Nobody is left alone long enough, allow their memories to return.
-        if (you.elapsed_time > mons->props[NOBODY_RECOVERY_KEY].get_int())
-        {
-            mons->props.erase(NOBODY_RECOVERY_KEY);
-            initialize_nobody_memories(*mons);
         }
 
         break;
@@ -1314,7 +1293,7 @@ void initialize_nobody_memories(monster& nobody)
     for (size_t i = 0; i < _recollections.size(); ++i)
         weights.push_back({i, _recollections[i].weight});
 
-    for (int i = 0; i < 3; ++i)
+    for (int i = 0; i < NOBODY_MAX_MEMORIES; ++i)
     {
         const int index = *random_choose_weighted(weights);
         memories.push_back(index);
@@ -1406,7 +1385,7 @@ bool pyrrhic_recollection(monster& nobody)
     // Allow Nobody to wake up if you kill them in their sleep
     behaviour_event(&nobody, ME_ALERT);
 
-    avoided_death_fineff::schedule(&nobody);
+    schedule_avoided_death_fineff(&nobody);
 
     return true;
 }
@@ -1457,69 +1436,96 @@ void solar_ember_blast()
     ember->del_ench(ENCH_SPELL_CHARGED);
 }
 
+void activate_tesseracts()
+{
+    if (you.props.exists(TESSERACT_SPAWN_COUNTER_KEY))
+        return;
+
+    bool did_activate = false;
+    for (monster_iterator mi; mi; ++mi)
+    {
+        if (mi->type != MONS_BOUNDLESS_TESSERACT)
+            continue;
+
+        behaviour_event(*mi, ME_ALERT);
+        env.map_knowledge(mi->pos()).set_monster(monster_info(*mi));
+        set_terrain_seen(mi->pos());
+        view_update_at(mi->pos());
+#ifdef USE_TILE
+        tiles.update_minimap(mi->pos());
+#endif
+
+        if (!did_activate)
+        {
+            mprf(MSGCH_WARN, "You feel the power of Zot begin to gather its forces!");
+            mark_milestone("tesseract.activate", "activated a tesseract");
+            mi->props[TESSERACT_SPAWN_TIMER_KEY] = you.elapsed_time;
+            mi->props[TESSERACT_XP_KEY] = 15000;
+            tesseract_action(**mi);
+            did_activate = true;
+
+            // Tracked on the player instead of the monster so status lookup is quicker.
+            you.props[TESSERACT_SPAWN_COUNTER_KEY] = 0;
+        }
+    }
+}
+
 void tesseract_action(monster& mon)
 {
     // Only operate logic on a single tesseract on the floor
-    if (mon.props.exists(TESSERACT_DUMMY_KEY) || mon.behaviour == BEH_SLEEP)
+    if (!mon.props.exists(TESSERACT_SPAWN_TIMER_KEY))
         return;
-
-    // When we become alerted, start the spawn timer and announce ourselves to the player.
-    if (mon.behaviour != BEH_SLEEP && !mon.props.exists(TESSERACT_START_TIME_KEY))
-    {
-        mprf(MSGCH_WARN, "You feel the power of Zot begin to gather its forces!");
-        mark_milestone("tesseract.activate", "activated a tesseract");
-
-        for (monster_iterator mi; mi; ++mi)
-        {
-            if (mi->type != MONS_BOUNDLESS_TESSERACT)
-                continue;
-
-            env.map_knowledge(mi->pos()).set_monster(monster_info(*mi));
-            set_terrain_seen(mi->pos());
-            view_update_at(mi->pos());
-
-#ifdef USE_TILE
-            tiles.update_minimap(mi->pos());
-#endif
-
-            // Mark any other tesseracts on the floor as dummies, so they don't operate independently.
-            if (mi->mid != mon.mid)
-            {
-                mi->props[TESSERACT_DUMMY_KEY] = true;
-                behaviour_event(*mi, ME_ALERT);
-            }
-        }
-
-        you.props[TESSERACT_START_TIME_KEY] = you.elapsed_time;
-        mon.props[TESSERACT_START_TIME_KEY] = you.elapsed_time;
-        mon.props[TESSERACT_SPAWN_TIMER_KEY] = you.elapsed_time;
-        mon.props[TESSERACT_XP_KEY] = 15000;
-    }
 
     // Handle regular spawning
     int& timer = mon.props[TESSERACT_SPAWN_TIMER_KEY].get_int();
+    int& count = you.props[TESSERACT_SPAWN_COUNTER_KEY].get_int();
 
-    // Don't act as if more than 1000 turns have passed off-level (in case the
-    // player goes to do Extended in the meantime).
-    if (you.elapsed_time - timer > 10000)
-        timer = you.elapsed_time - 10000;
+    // Don't act as if more than 500 turns have passed off-level. (It only runs
+    // off-level at all to prevent it being correct to return to Zot:4 every
+    // time you want to rest, and this is hopefully long enough to cover those
+    // situations.)
+    if (you.elapsed_time - timer > 5000)
+        timer = you.elapsed_time - 5000;
+
+    // Exit early if it's not yet time to spawn things.
+    if (you.elapsed_time < timer)
+        return;
+
+    // Count number of both tesseract spawns and remaining non-tesseract
+    // monsters on the floor.
+    int spawn_count = 0;
+    int non_spawn_count = 0;
+    for (monster_iterator mi; mi; ++mi)
+    {
+        if (mi->props.exists(TESSERACT_CREATED_KEY))
+            ++spawn_count;
+        else if (!mi->is_summoned() && !mi->is_peripheral() && !mi->wont_attack())
+            ++non_spawn_count;
+    }
+
+    // Cap number of tesseract spawns at 60, and total number of monsters on the
+    // floor at 100 (which is above the average starting monster count, but not
+    // the *maximum* starting monster count).
+    int allowed = min(60 - spawn_count, 100 - spawn_count - non_spawn_count);
 
     // Catch up however many spawns should have happened since the last time
     // we activated.
-    while (you.elapsed_time >= timer)
+    while (you.elapsed_time >= timer && allowed > 0)
     {
-        const int time_passed = you.elapsed_time - mon.props[TESSERACT_START_TIME_KEY].get_int();
-        const int interval = max(200, 600 - (time_passed / 25));
-
-        timer += random_range(interval, interval * 4 / 3);
+        // Spawn the earliest monsters from the tesseract more quickly, then
+        // slow down to a constant rate.
+        const int interval = 70 + (min(15, count) * 50 / 2);
+        timer += random_range(interval, interval * 5 / 4);
 
         mgen_data mg(one_chance_in(6) ? MONS_ORB_GUARDIAN : WANDERING_MONSTER);
         mg.place = level_id::current();
         mg.place.depth = 7;
         mg.flags |= MG_FORBID_BANDS;
-        mg.proximity = PROX_AWAY_FROM_PLAYER;
         mg.foe = MHITYOU;
         mg.non_actor_summoner = "a Boundless Tesseract";
+        mg.proximity = PROX_AWAY_FROM_PLAYER;
+        if (count >= 80 && one_chance_in(4))
+            mg.proximity = PROX_CLOSE_TO_PLAYER;
 
         monster* spawn = mons_place(mg);
 
@@ -1536,5 +1542,9 @@ void tesseract_action(monster& mon)
             xp_pool -= xp;
         else
             spawn->flags |= (MF_HARD_RESET | MF_NO_REWARD);
+
+        spawn->props[TESSERACT_CREATED_KEY] = true;
+        --allowed;
+        ++count;
     }
 }

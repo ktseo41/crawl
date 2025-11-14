@@ -153,6 +153,7 @@ vector<mutation_type> get_removed_mutations()
         MUT_GOURMAND,
         MUT_AWKWARD_TONGUE,
         MUT_NOISE_DAMPENING,
+        MUT_BERSERK,
 #endif
     };
 
@@ -204,7 +205,6 @@ static const mutation_conflict mut_conflicts[] =
     { MUT_HIGH_MAGIC,          MUT_LOW_MAGIC,               true},
     { MUT_WILD_MAGIC,          MUT_SUBDUED_MAGIC,           true},
     { MUT_REGENERATION,        MUT_INHIBITED_REGENERATION,  true},
-    { MUT_BERSERK,             MUT_CLARITY,                 true},
     { MUT_FAST,                MUT_SLOW,                    true},
     { MUT_HEAT_RESISTANCE,     MUT_HEAT_VULNERABILITY,      true},
     { MUT_COLD_RESISTANCE,     MUT_COLD_VULNERABILITY,      true},
@@ -1232,14 +1232,12 @@ static bool _accept_mutation(mutation_type mutat, bool temp)
 
     // Devolution gives out permanent badmuts, so we don't want to give it as
     // a temporary mut. Stat mutations are too boring to have a relevant effect
-    // on this timescale, and Berserkitis in particular is easy to miss being
-    // applied in a tempmut storm and disproportionately punishing if you don't.
+    // on this timescale, too.
     if (temp
         && (mutat == MUT_DEVOLUTION
             || mutat == MUT_WEAK
             || mutat == MUT_CLUMSY
-            || mutat == MUT_DOPEY
-            || mutat == MUT_BERSERK))
+            || mutat == MUT_DOPEY))
     {
         return false;
     }
@@ -1664,7 +1662,7 @@ bool mut_is_compatible(mutation_type mut, bool base_only)
             return false;
 
         // Formicids have stasis and so prevent mutations that would do nothing.
-        if ((mut == MUT_BERSERK || mut == MUT_TELEPORT) && you.stasis())
+        if (mut == MUT_TELEPORT && you.stasis())
             return false;
 
         if (mut == MUT_ACUTE_VISION && you.innate_sinv())
@@ -1698,9 +1696,6 @@ bool mut_is_compatible(mutation_type mut, bool base_only)
         return false;
 
     if (mut == MUT_TELEPORT && (you.no_tele() || player_in_branch(BRANCH_ABYSS)))
-        return false;
-
-    if (mut == MUT_BERSERK && you.is_lifeless_undead())
         return false;
 
     if (mut == MUT_DEMONIC_GUARDIAN && you.allies_forbidden())
@@ -1860,7 +1855,7 @@ bool mutate(mutation_type which_mutation, const string &reason, bool failMsg,
     if (mutclass == MUTCLASS_NORMAL
         && (which_mutation == RANDOM_MUTATION
             || which_mutation == RANDOM_XOM_MUTATION)
-        && x_chance_in_y(you.how_mutated(false, true), 15))
+        && x_chance_in_y(you.how_mutated(), 15))
     {
         // God gifts override mutation loss due to being heavily
         // mutated.
@@ -1925,7 +1920,7 @@ bool mutate(mutation_type which_mutation, const string &reason, bool failMsg,
     ASSERT(rc == 0);
 
 #ifdef USE_TILE_LOCAL
-    const unsigned int old_talents = your_talents(false).size();
+    const unsigned int old_talents = your_talents().size();
 #endif
 
     const int levels = (which_mutation == RANDOM_CORRUPT_MUTATION
@@ -2079,7 +2074,7 @@ bool mutate(mutation_type which_mutation, const string &reason, bool failMsg,
     }
 
 #ifdef USE_TILE_LOCAL
-    if (your_talents(false).size() != old_talents)
+    if (your_talents().size() != old_talents)
     {
         tiles.layout_statcol();
         redraw_screen();
@@ -2349,16 +2344,17 @@ bool delete_mutation(mutation_type which_mutation, const string &reason,
  */
 bool delete_all_mutations(const string &reason)
 {
+    bool found = false;
     for (int i = 0; i < NUM_MUTATIONS; ++i)
     {
         while (_delete_single_mutation_level(static_cast<mutation_type>(i), reason, true))
-            ;
+            found = true;
     }
     ASSERT(you.attribute[ATTR_TEMP_MUTATIONS] == 0);
-    ASSERT(you.how_mutated(false, true, false) == 0);
+    ASSERT(you.how_mutated(true, false, false, true) == 0);
     you.attribute[ATTR_TEMP_MUT_KILLS] = 0;
 
-    return !you.how_mutated();
+    return found;
 }
 
 /*
@@ -3087,13 +3083,15 @@ int temp_mutation_count()
 /**
  * How mutated is the player?
  *
- * @param innate Whether to count innate mutations (default false).
- * @param levels Whether to add up mutation levels, as opposed to just counting number of mutations (default false).
- * @param temp Whether to count temporary mutations (default true).
- * @return Either the number of matching mutations, or the sum of their
- *         levels, depending on \c levels
+ * @param normal Whether to count normal mutations (default true).
+ * @param silver Whether to count innate mutations that affect silver vulnerability (default false).
+ * @param all_innate Whether to count all innate mutations (default false). Includes and supercedes \c silver.
+ * @param temp Whether to count temporary mutations (default false).
+ * @param levels Whether to add up mutation levels, as opposed to just counting number of mutations (default true).
+ *
+ * @return Either the number of matching mutations, or the sum of their levels, depending on \c levels.
  */
-int player::how_mutated(bool innate, bool levels, bool temp) const
+int player::how_mutated(bool normal, bool silver, bool all_innate, bool temp, bool levels) const
 {
     int result = 0;
 
@@ -3103,23 +3101,32 @@ int player::how_mutated(bool innate, bool levels, bool temp) const
         {
             // Infernal Marks should count for silver vulnerability despite
             // being permanent mutations.
-            const bool check_innate = innate || is_makhleb_mark(static_cast<mutation_type>(i));
-            const int mut_level = get_base_mutation_level(static_cast<mutation_type>(i),
-                                                          check_innate, temp);
+            const bool innate = all_innate
+                                 || silver
+                                     && (is_makhleb_mark(static_cast<mutation_type>(i))
+                                         || you.species == SP_DEMONSPAWN);
+            int mut_level = get_base_mutation_level(static_cast<mutation_type>(i),
+                                                    innate, temp, normal);
+
+            // Ru sacrifices count as innate mutations, but should not make
+            // demonspawn extra-vulnerable to silver.
+            if (silver && !all_innate && mut_level > 0)
+                mut_level -= you.sacrifices[i];
 
             if (levels)
                 result += mut_level;
             else if (mut_level > 0)
                 result++;
         }
-        if (you.species == SP_DEMONSPAWN
-            && you.props.exists(NUM_SACRIFICES_KEY))
-        {
-            result -= you.props[NUM_SACRIFICES_KEY].get_int();
-        }
     }
 
+    ASSERT(result >= 0);
     return result;
+}
+
+bool player::has_any_mutations() const
+{
+    return how_mutated(true, true, true, true, true) > 0;
 }
 
 // Primary function to handle demonic guardians.
@@ -3289,7 +3296,7 @@ void set_evolution_mut_xp(bool malignant)
 
 int protean_grace_amount()
 {
-    int amount = you.how_mutated(false, false, true);
+    int amount = you.how_mutated(true, false, false, true, false);
 
     // A soft cap for Xom, Jiyva, and Demonspawn.
     // XXX: rewrite _player_base_evasion_modifiers() to allow +0.5 EV bonuses?
@@ -3333,21 +3340,54 @@ const string bane_desc(bane_type bane)
     return bane_data[bane_index[bane]].description;
 }
 
-bane_type bane_from_name(string name)
+/*
+ * Given some name, return a bane type. Tries to match the short description as found in `bane-data.h`.
+ * If `partial_matches` is set, it will fill the vector with any partial matches it finds. If there is exactly one,
+ * will return this bane, otherwise, will fail.
+ *
+ * @param partial_matches   an optional pointer to a vector, in case the consumer wants to do something
+ *                          with the partial match results (e.g. show them to the user). If this is `nullptr`,
+ *                          will accept only exact matches.
+ *
+ * @return the bane type if successful, otherwise NUM_BANES if it can't find a single match.
+ */
+bane_type bane_from_name(string name, vector<bane_type> *partial_matches)
 {
-    string spec = lowercase_string(name);
-    for (int i = 0; i < NUM_BANES; ++i)
-        if (name == bane_name(static_cast<bane_type>(i), true))
-            return static_cast<bane_type>(i);
+    bane_type bane = NUM_BANES;
 
-    return NUM_BANES;
+    string spec = lowercase_string(name);
+
+    for (int i = 0; i < NUM_BANES; ++i)
+    {
+        bane_type ban = static_cast<bane_type>(i);
+        const string ban_name_c = bane_name(ban, true);
+        if (ban_name_c.empty())
+            continue;
+        const string ban_name = lowercase_string(ban_name_c);
+
+        if (spec == ban_name)
+        {
+            bane = ban;
+            break;
+        }
+
+        if (partial_matches && strstr(ban_name.c_str(), spec.c_str()))
+            partial_matches->push_back(ban);
+    }
+
+    // If only one matching bane, use that.
+    if (partial_matches && bane == NUM_BANES && partial_matches->size() == 1)
+        return (*partial_matches)[0];
+
+    return bane;
 }
 
 static bool _bane_is_compatible(bane_type bane)
 {
-    if (bane == BANE_RECKLESS)
-        return player_shield_class(1, false, true) > 0;
-
+#if TAG_MAJOR_VERSION == 34
+    if (bane == BANE_RECKLESS_REMOVED)
+        return false;
+#endif
     return true;
 }
 
@@ -3373,6 +3413,7 @@ static void _init_bane_dilettante()
 
         wp_skills.push_back({skill, you.skill(skill, 100, true, false)});
     }
+    wp_skills.push_back({SK_UNARMED_COMBAT, you.skill(SK_UNARMED_COMBAT, 100, true, false)});
 
     vector<pair<skill_type, int>> mag_skills;
     for (skill_type skill = SK_FIRST_MAGIC_SCHOOL; skill <= SK_LAST_MAGIC; ++skill)
@@ -3405,10 +3446,12 @@ static void _init_bane_dilettante()
  * @param reason    The source of this bane (for note-taking)
  * @param duration  The duration (in XP-units) this bane will last. If 0, use
  *                  the default duration for this type of bane.
+ * @param mult      A multiplier to the base duration this bane will last, as a
+ *                  percentage. Defaults to 100.
  *
  * @return  Whether a bane was successfully added.
  */
-bool add_bane(bane_type bane, string reason, int duration)
+bool add_bane(bane_type bane, string reason, int duration, int mult)
 {
     if (bane == NUM_BANES)
     {
@@ -3428,16 +3471,14 @@ bool add_bane(bane_type bane, string reason, int duration)
     if (duration == 0)
         duration = bane_data[bane_index[bane]].duration;
 
+    duration = duration * mult / 100;
+
     if (you.banes[bane] == 0)
         mprf(MSGCH_WARN, "You are stricken with the %s.", bane_name(bane).c_str());
     else
         mprf(MSGCH_WARN, "Your %s grows stronger.", bane_name(bane).c_str());
 
     you.banes[bane] += duration;
-
-    // Actually update SH immediately. (Yes, that is the right flag....)
-    if (bane == BANE_RECKLESS)
-        you.redraw_armour_class = true;
 
     // Choose which skills to penalty
     if (bane == BANE_DILETTANTE)
@@ -3453,16 +3494,16 @@ void remove_bane(bane_type bane)
     mprf(MSGCH_RECOVERY, "The %s upon you is lifted.", bane_name(bane).c_str());
     you.banes[bane] = 0;
 
-    if (bane == BANE_RECKLESS)
-        you.redraw_armour_class = true;
-
     if (bane == BANE_MORTALITY)
         add_daction(DACT_BANE_MORTALITY_CLEANUP);
 
     take_note(Note(NOTE_LOSE_BANE, bane));
 }
 
-int xl_to_remove_bane(bane_type bane)
+// Calculate how many XLs worth of XP it would take for the player to remove a
+// specified bane. If they do not have the bane, this is calculated as if they
+// had it for its default duration (as affected by mult)
+int xl_to_remove_bane(bane_type bane, int mult)
 {
     int progress = 0;
     int you_skill_cost_level = you.skill_cost_level;
@@ -3471,7 +3512,10 @@ int xl_to_remove_bane(bane_type bane)
     const int cost_factor =
         (you.has_mutation(MUT_ACCURSED) || you.undead_state() != US_ALIVE) ? 2
                                                                            : 1;
-    const int bane_xp = you.banes[bane] * cost_factor;
+
+    const int amount = you.banes[bane] > 0 ? you.banes[bane]
+                                           : bane_data[bane_index[bane]].duration * mult / 100;
+    const int bane_xp = amount * cost_factor;
 
     while (progress < bane_xp)
     {
@@ -3527,7 +3571,7 @@ void maybe_apply_bane_to_monster(monster& mons)
 
     if (you.has_bane(BANE_PARADOX) && !mons.has_spell(SPELL_MANIFOLD_ASSAULT)
         && mons_has_attacks(mons)
-        && one_chance_in(12))
+        && one_chance_in(7))
     {
         simple_monster_message(mons, " is touched by paradox!");
         mons.add_ench(mon_enchant(ENCH_PARADOX_TOUCHED, 0, nullptr, INFINITE_DURATION));
@@ -3535,7 +3579,7 @@ void maybe_apply_bane_to_monster(monster& mons)
 
     // Give this one out to entire groups at once, since it does surprisingly
     // little to be given to just one monster in an entire group, on average.
-    if (you.has_bane(BANE_WARDING) && one_chance_in(5))
+    if (you.has_bane(BANE_WARDING) && one_chance_in(7))
     {
         mons.add_ench(mon_enchant(ENCH_WARDING, 0, nullptr, INFINITE_DURATION));
         for (monster_near_iterator mi(mons.pos(), LOS_NO_TRANS); mi; ++mi)

@@ -27,6 +27,7 @@
 #include "dgn-overview.h"
 #include "english.h"
 #include "env.h"
+#include "evoke.h"
 #include "fineff.h"
 #include "god-abil.h"
 #include "god-blessing.h"
@@ -49,6 +50,7 @@
 #include "mon-cast.h"
 #include "mon-explode.h"
 #include "mon-gear.h"
+#include "mon-pathfind.h"
 #include "mon-place.h"
 #include "mon-poly.h"
 #include "mon-speak.h"
@@ -414,6 +416,7 @@ static void _create_monster_hide(monster_type mtyp, monster_type montype,
     }
 
     item.flags |= ISFLAG_IDENTIFIED;
+    item.flags |= ISFLAG_SEEN;
 }
 
 static void _create_monster_wand(monster_type mtyp, coord_def pos, bool silent)
@@ -486,15 +489,41 @@ item_def* place_monster_corpse(const monster& mons, bool force)
     if (!no_coinflip && coinflip())
         return nullptr;
 
+    coord_def dest = mons.pos();
+
     // The game can attempt to place a corpse for an out-of-bounds monster
     // if a shifter turns into a ballistomycete spore and explodes. In this
     // case we place no corpse since the explosion means anything left
     // over would be scattered, tiny chunks of shifter.
-    if (!in_bounds(mons.pos()) && !force)
+    if (!in_bounds(dest) && !force)
         return nullptr;
 
-    // Don't attempt to place corpses within walls, either.
-    if (feat_is_solid(env.grid(mons.pos())) && !force)
+    // If the monster is inside a wall it was a wall monster.
+    // Find a nearby spot, preferably in sight of player, to drop the corpse.
+    if (feat_is_solid(env.grid(dest)) && !force)
+    {
+        int found = 0;
+        bool in_sight = false;
+        for (adjacent_iterator ai(dest); ai; ++ai)
+        {
+            if (!feat_has_solid_floor(env.grid(*ai)))
+                continue;
+            bool can_see = you.see_cell(*ai);
+            if (in_sight && !can_see)
+                continue;
+            // First "seen" cell supercedes any previously picked
+            if (can_see && !in_sight)
+            {
+                in_sight = true;
+                dest = *ai;
+                found = 1;
+            }
+            else if (one_chance_in(++found))
+                dest = *ai;
+        }
+    }
+    // Still didn't find a valid spot.
+    if (feat_is_solid(env.grid(dest)) && !force)
         return nullptr;
 
     // If we were told not to leave a corpse, don't.
@@ -511,7 +540,7 @@ item_def* place_monster_corpse(const monster& mons, bool force)
     {
         _gold_pile(corpse, mons_species(mons.type));
         // If gold would be destroyed, give it directly to the player instead.
-        if (feat_eliminates_items(env.grid(mons.pos())))
+        if (feat_eliminates_items(env.grid(dest)))
         {
             get_gold(corpse, corpse.quantity, false);
             destroy_item(corpse, true);
@@ -523,7 +552,7 @@ item_def* place_monster_corpse(const monster& mons, bool force)
 
     origin_set_monster(corpse, &mons);
 
-    if ((mons.flags & MF_EXPLODE_KILL) && _explode_corpse(corpse, mons.pos()))
+    if ((mons.flags & MF_EXPLODE_KILL) && _explode_corpse(corpse, dest))
     {
         // The corpse itself shouldn't remain.
         item_was_destroyed(corpse);
@@ -531,8 +560,8 @@ item_def* place_monster_corpse(const monster& mons, bool force)
         return nullptr;
     }
 
-    if (in_bounds(mons.pos()))
-        move_item_to_grid(&o, mons.pos(), !mons.swimming());
+    if (in_bounds(dest))
+        move_item_to_grid(&o, dest, !mons.swimming());
 
     if (o == NON_ITEM)
         return nullptr;
@@ -713,7 +742,7 @@ static bool _ely_heal_monster(monster* mons, killer_type killer, int i)
 
     behaviour_event(mons, ME_WHACK, act);
 
-    lugonu_meddle_fineff::schedule();
+    schedule_lugonu_meddle_fineff();
 
     return true;
 }
@@ -786,11 +815,12 @@ static bool _vampire_make_thrall(monster* mons)
     behaviour_event(mons, ME_EVAL);
 
     // Schedule our actual revival for the end of this combat round.
-    avoided_death_fineff::schedule(mons);
+    schedule_avoided_death_fineff(mons);
 
     return true;
 }
 
+static void _blorkula_bat_merge_message(monster* blork, int bat_count);
 
 /**
  * Attempt to get a deathbed conversion for the given orc.
@@ -824,6 +854,15 @@ static bool _beogh_forcibly_convert_orc(monster &mons, killer_type killer)
         {
             ctype = follower ? conv_t::vengeance_follower
                              : conv_t::vengeance;
+        }
+
+        // XXX: If Blorkula got a deathbed conversion as a bat, he'll have
+        // re-formed into an orc by now. Properly mention this just before
+        // his conversion message.
+        if (mons.type == MONS_BLORKULA_THE_ORCULA
+            && mons.props.exists(BLORKULA_DIE_FOR_REAL_KEY))
+        {
+            _blorkula_bat_merge_message(&mons, 1);
         }
 
         beogh_convert_orc(&mons, ctype);
@@ -921,7 +960,10 @@ static bool _blorkula_bat_split(monster& blorkula, killer_type ktype)
     shuffle_array(bat_colours);
 #endif
 
+    mon_enchant vengeance_target = blorkula.get_ench(ENCH_VENGEANCE_TARGET);
     follower saved_blork = follower(blorkula);
+    if (vengeance_target.ench != ENCH_NONE)
+        saved_blork.mons.del_ench(ENCH_VENGEANCE_TARGET, true, false);
     bool placed_bat = false;
     for (int i = 0; i < num_bats; ++i)
     {
@@ -940,6 +982,11 @@ static bool _blorkula_bat_split(monster& blorkula, killer_type ktype)
             mons_add_blame(bat, "manifested out of " + blorkula.name(DESC_A, true));
             bat->flags |= (MF_NO_REWARD | MF_WAS_IN_VIEW);
             placed_bat = true;
+            if (vengeance_target.ench != ENCH_NONE)
+            {
+                bat->add_ench(vengeance_target);
+                you.duration[DUR_BEOGH_SEEKING_VENGEANCE] += 1;
+            }
         }
     }
 
@@ -965,7 +1012,15 @@ static monster* _retrieve_saved_blorkula(monster& bat)
 {
     follower saved_blork;
     saved_blork.read_from_prop(bat.props[SAVED_BLORKULA_KEY].get_vector());
+    const bool is_vengeance_target = bat.has_ench(ENCH_VENGEANCE_TARGET);
+    if (is_vengeance_target)
+    {
+        saved_blork.mons.add_ench(bat.get_ench(ENCH_VENGEANCE_TARGET));
+        you.duration[DUR_BEOGH_SEEKING_VENGEANCE] += 1;
+    }
     monster* blork = saved_blork.place();
+    if (!blork && is_vengeance_target)
+        beogh_progress_vengeance();
     return blork;
 }
 
@@ -1024,11 +1079,20 @@ void blorkula_bat_merge(monster& bat)
     }
     blork->move_to_pos(pos);
 
+    _blorkula_bat_merge_message(blork, bat_count);
+}
+
+static void _blorkula_bat_merge_message(monster* blork, int bat_count)
+{
     if (you.can_see(*blork))
     {
-        mprf(MSGCH_MONSTER_SPELL,
-             "The bats swarm back together and %s reappears in a puff of iridescent mist.",
-             blork->name(DESC_THE).c_str());
+        string msg = bat_count == 1 ? "The bat shimmers"
+                                    : "The bats swarm back together";
+
+        msg += " and " + blork->name(DESC_THE)
+            +  " reappears in a puff of iridescent mist.";
+
+        mprf(MSGCH_MONSTER_SPELL, "%s", msg.c_str());
     }
 }
 
@@ -1081,7 +1145,7 @@ static bool _monster_avoided_death(monster* mons, killer_type killer,
             // monster::banish sets damage_friendly and not resetting that could
             // crash. monster::heal resets it but not if it was at full health.
             mons->damage_total = mons->damage_friendly = 0;
-            avoided_death_fineff::schedule(mons);
+            schedule_avoided_death_fineff(mons);
             return true;
         }
     }
@@ -1260,7 +1324,7 @@ static void _search_dungeon(const coord_def & start,
 static void _infestation_create_scarab(monster* mons)
 {
     mons->flags |= MF_EXPLODE_KILL;
-    infestation_death_fineff::schedule(mons->pos(), mons->name(DESC_THE));
+    schedule_infestation_death_fineff(mons->pos(), mons->name(DESC_THE));
 }
 
 static void _pharaoh_ant_bind_souls(monster *mons)
@@ -1302,9 +1366,6 @@ static void _print_summon_poof_message(const monster& mons, bool corpse = false)
 
 static void _monster_die_cloud(const monster& mons, bool real_death)
 {
-    if (cell_is_solid(mons.pos()))
-        return;
-
     if (real_death)
     {
         switch (mons.type)
@@ -1427,8 +1488,12 @@ static string _derived_undead_message(const monster &mons, monster_type which_z,
         return "The dead are crawling!"; // to say nothing of creeping
 
     const monster_type genus = mons_genus(mons.type);
-    if (genus == MONS_FROG || genus == MONS_QUOKKA)
+    // XXX: Prince Ribbit is in his human shape after he dies.
+    if ((genus == MONS_FROG && mons.type != MONS_PRINCE_RIBBIT)
+         || genus == MONS_QUOKKA)
+    {
         return "The dead are hopping!";
+    }
 
     return "The dead are walking!"; // a classic for sure
 }
@@ -1482,7 +1547,7 @@ static void _make_derived_undead(monster* mons, bool quiet,
     mg.set_summoned(beh == BEH_FRIENDLY ? &you : nullptr, spell, 0, false);
     mg.set_base(mons->type);
     // Prefer to be created wherever the dead monster was, but allow placing up
-    // to 2 spaces away, if needbe.
+    // to 2 spaces away, if need be.
     mg.set_range(0, 2);
 
     if (spell == MON_SUMM_WPN_REAP)
@@ -1534,7 +1599,7 @@ static void _make_derived_undead(monster* mons, bool quiet,
     const string message = quiet ? "" :
                            god == GOD_KIKUBAAQUDGHA ? "Kikubaaqudgha cackles." :
                            _derived_undead_message(*mons, which_z, msg);
-    make_derived_undead_fineff::schedule(mons->pos(), mg,
+    schedule_make_derived_undead_fineff(mons->pos(), mg,
             mons->get_experience_level(), agent_name, message);
 }
 
@@ -1772,6 +1837,104 @@ static void _martyr_death_wail(monster &mons)
     }
 
     return;
+}
+
+static void _cassandra_death_ambush()
+{
+    // First, find all valid spots to place an ambushing monster: something
+    // relatively close, but not in the player's LoS (or immediately around a
+    // corner).
+    vector<coord_def> spots;
+    for (rectangle_iterator ri(you.pos(), 10); ri; ++ri)
+    {
+        if (in_bounds(*ri) && !cell_is_solid(*ri) && !you.see_cell(*ri)
+            && !actor_at(*ri) && grid_distance(you.pos(), *ri) > 3)
+        {
+            spots.push_back(*ri);
+        }
+    }
+
+    // In the very unlikely event that there are no such spots, we'll let the
+    // player off lucky.
+    if (spots.empty())
+    {
+        mpr("You feel as though you may have cheated fate.");
+        return;
+    }
+
+    shuffle_array(spots);
+
+    level_id place = level_id::current();
+    place.depth += 2;
+    mgen_data mg(RANDOM_MOBILE_MONSTER, BEH_HOSTILE, you.pos(), MHITYOU,
+                 MG_FORBID_BANDS | MG_FORCE_PLACE);
+    mg.set_place(place);
+    mg.set_non_actor_summoner("an inevitable fate");
+
+    const int num = random_range(3, 5);
+
+    // For each monster, compute what tiles it could reach within 10 moves of
+    // the player's location, then test each valid placement spot against this,
+    // essentially placing them on a random reachable tile that is out of sight,
+    // and neither too close nor too far.
+    //
+    // Since traversability varies per monster type (ie: some can open doors,
+    // some can fly, etc.), we need a real monster to test this with. This means
+    // we create a random monster near the player, attempt to place it in a
+    // valid location, and then delete it if we fail (and try a different one).
+    int placed = 0;
+    for (int tries = 0; tries < 10 && placed <= num; ++tries)
+    {
+        if (monster* mon = create_monster(mg))
+        {
+            monster_pathfind mp;
+            mp.fill_traversability(mon, 12);
+
+            bool did_place = false;
+            for (coord_def& pos : spots)
+            {
+                if (mp.is_reachable(pos))
+                {
+                    mon->move_to_pos(pos, true, true);
+                    did_place = true;
+                    ++placed;
+
+                    // Effectively erase this position from the list, so we
+                    // don't try to reuse it.
+                    pos.x = 0;
+                    pos.y = 0;
+                    break;
+                }
+            }
+
+            if (!did_place)
+                monster_die(*mon, KILL_RESET, NON_MONSTER);
+            else
+                mon->add_ench(mon_enchant(ENCH_HAUNTING, 0, &you, INFINITE_DURATION));
+        }
+    }
+
+    if (placed > 0)
+        mpr("You feel an ambush drawing close....");
+    else
+        mpr("You feel as though you may have cheated fate.");
+
+    // Now seal all stairs on the floor for a moderate duration.
+    const int seal_duration = random_range(150, 300);
+    for (rectangle_iterator ri(0); ri; ++ri)
+    {
+        if (feat_is_travelable_stair(env.grid(*ri)))
+        {
+            dungeon_feature_type stype;
+            if (feat_stair_direction(env.grid(*ri)) == CMD_GO_UPSTAIRS)
+                stype = DNGN_SEALED_STAIRS_UP;
+            else
+                stype = DNGN_SEALED_STAIRS_DOWN;
+
+            temp_change_terrain(*ri, stype, seal_duration,
+                                TERRAIN_CHANGE_DOOR_SEAL);
+        }
+    }
 }
 
 static bool _mons_reaped(actor &killer, monster& victim)
@@ -2296,14 +2459,18 @@ static void _player_on_kill_effects(monster& mons, killer_type killer,
         makhleb_crucible_kill(mons);
     }
 
-    if (you.has_bane(BANE_SUCCOUR))
+    if (you.has_bane(BANE_SUCCOUR) && !mons.is_firewood() && !mons.wont_attack())
     {
         bool visible_effect = false;
         const int healing = random_range(mons.max_hit_points / 3,
                                          mons.max_hit_points / 2);
         for (monster_near_iterator mi(mons.pos()); mi; ++mi)
         {
-            if (mons_aligned(&mons, *mi) && mi->hit_points < mi->max_hit_points)
+            // Don't heal the monster that just died as this can clear the
+            // damage tracking used to decide if you get XP for the kill
+            if (mons_aligned(&mons, *mi)
+                && mi->hit_points < mi->max_hit_points
+                && *mi != &mons)
             {
                 if (!visible_effect && you.can_see(**mi))
                     visible_effect = true;
@@ -2322,10 +2489,14 @@ static void _player_on_kill_effects(monster& mons, killer_type killer,
             temp_mutation_wanes();
     }
 
-    if (YOU_KILL(killer) && !mons.props.exists(ATTACK_KILL_KEY)
-        && you.wearing_ego(OBJ_ARMOUR, SPARM_PYROMANIA))
+    if (YOU_KILL(killer)
+        && you.wearing_ego(OBJ_ARMOUR, SPARM_PYROMANIA)
+        && !mons.props.exists(ATTACK_KILL_KEY)
+        && !you.props.exists(PYROMANIA_TRIGGERED_KEY)
+        && x_chance_in_y(pyromania_trigger_chance(), 100))
     {
-        you.props[PYROMANIA_TRIGGER_KEY].get_int() += 1;
+        schedule_pyromania_fineff();
+        you.props[PYROMANIA_TRIGGERED_KEY] = true;
     }
 }
 
@@ -2535,17 +2706,14 @@ item_def* monster_die(monster& mons, killer_type killer,
         if (!monster_habitable_grid(simu.base_type, mons.pos()))
             find_habitable_spot_near(mons.pos(), simu.base_type, 3, simu.pos, 0);
 
-        monster_type real_simu_type = simu.base_type;
-        // Don't use uniques' names here; their simulacra won't use them either.
-        if (mons_is_unique(simu.base_type))
-            real_simu_type = mons_species(simu.base_type);
+        // No "the Enchantress".
+        string name = remove_prepended_the(mons_type_name(simu.base_type, DESC_PLAIN));
 
-        string msg = "Your " + mons_type_name(real_simu_type, DESC_PLAIN) +
-                     " simulacrum begins to move.";
-        make_derived_undead_fineff::schedule(simu.pos, simu,
-                                             get_monster_data(simu.base_type)->HD,
-                                             "the player",
-                                             msg.c_str(), true);
+        string msg = "Your " + name + " simulacrum begins to move.";
+        schedule_make_derived_undead_fineff(simu.pos, simu,
+                                            get_monster_data(simu.base_type)->HD,
+                                            "the player",
+                                            msg.c_str(), true);
 
         silent = true;
     }
@@ -2647,6 +2815,36 @@ item_def* monster_die(monster& mons, killer_type killer,
         end_flayed_effect(&mons);
     else if (mons.type == MONS_PLAYER_SHADOW)
         dithmenos_cleanup_player_shadow(&mons);
+    else if (mons.type == MONS_ORB_GUARDIAN
+             && level_id::current() == level_id(BRANCH_ZOT, 5)
+             && !player_on_orb_run()
+             && !you.props.exists(TESSERACT_SPAWN_COUNTER_KEY))
+    {
+        // Verify any tesseracts still exist
+        bool found = false;
+        for (monster_iterator mi; mi; ++mi)
+        {
+            if (mi->type == MONS_BOUNDLESS_TESSERACT)
+            {
+                found = true;
+                break;
+            }
+        }
+
+        if (found)
+        {
+            if (you.can_see(mons))
+            {
+                mprf(MSGCH_WARN, "%s broadcasts a psychic alarm as it %s.",
+                    mons.name(DESC_THE).c_str(),
+                    (was_banished || !real_death) ? "disappears" : "dies");
+            }
+            else
+                mprf(MSGCH_WARN, "You feel something broadcast a psychic alarm.");
+
+            activate_tesseracts();
+        }
+    }
 
     if (mons.has_ench(ENCH_MAGNETISED))
     {
@@ -2668,7 +2866,7 @@ item_def* monster_die(monster& mons, killer_type killer,
             mprf(MSGCH_MONSTER_DAMAGE, MDAM_DEAD,
                  "Tendrils of ice devour %s body!", mons.name(DESC_ITS).c_str());
         }
-        death_spawn_fineff::schedule(MONS_PILLAR_OF_RIME,
+        schedule_death_spawn_fineff(MONS_PILLAR_OF_RIME,
                                     mons.pos(),
                                     random_range(4, 14) * BASELINE_DELAY,
                                     SPELL_RIMEBLIGHT);
@@ -3089,6 +3287,9 @@ item_def* monster_die(monster& mons, killer_type killer,
             mons.update_ench(summ);
         }
 
+        // Also wake them up if they're asleep
+        mons.behaviour = BEH_SEEK;
+
         // Hack: with cleanup_dead=false, a tentacle [segment] of a dead
         // [malign] kraken has no valid head reference.
         if (!mons_is_tentacle_or_tentacle_segment(mons.type))
@@ -3161,9 +3362,11 @@ item_def* monster_die(monster& mons, killer_type killer,
             if (duel)
                 mons.props.erase(OKAWARU_DUEL_CURRENT_KEY);
 
-            bennu_revive_fineff::schedule(mons.pos(), revives, att, mons.foe,
-                                          duel, gozag_bribe);
+            schedule_bennu_revive_fineff(mons.pos(), revives, att, mons.foe,
+                                         duel, gozag_bribe);
         }
+        else if (mons_is_mons_class(&mons, MONS_CASSANDRA) && real_death)
+            _cassandra_death_ambush();
     }
 
     // Must be done after health is set to zero and monster is properly marked dead.
@@ -3193,11 +3396,11 @@ item_def* monster_die(monster& mons, killer_type killer,
             }
         }
 
-        if (you.props.exists(TESSERACT_START_TIME_KEY))
+        if (you.props.exists(TESSERACT_SPAWN_COUNTER_KEY))
         {
             mprf(MSGCH_ORB, "You feel the reach of Zot diminish.");
             mark_milestone("tesseract.kill", "destroyed the tesseracts.");
-            you.props.erase(TESSERACT_START_TIME_KEY);
+            you.props.erase(TESSERACT_SPAWN_COUNTER_KEY);
         }
     }
     if (mons_is_tentacle_head(mons_base_type(mons)))
@@ -3239,7 +3442,7 @@ item_def* monster_die(monster& mons, killer_type killer,
     {
         // TODO: set attacker better? (Player attacker is handled by checking
         // killer when running the fineff.)
-        mummy_death_curse_fineff::schedule(
+        schedule_mummy_death_curse_fineff(
                 invalid_monster_index(killer_index)
                                             ? nullptr : &env.mons[killer_index],
                 &mons,
@@ -3603,7 +3806,7 @@ void mons_check_pool(monster* mons, const coord_def &oldpos,
                      killer_type killer, int killnum)
 {
     // Flying monsters don't make contact with the terrain.
-    if (!mons->ground_level())
+    if (mons->airborne())
         return;
 
     dungeon_feature_type grid = env.grid(mons->pos());
@@ -3819,7 +4022,7 @@ bool mons_is_mons_class(const monster* mons, monster_type type)
  **/
 void pikel_band_neutralise()
 {
-    delayed_action_fineff::schedule(DACT_PIKEL_MINIONS, "");
+    schedule_delayed_action_fineff(DACT_PIKEL_MINIONS, "");
 }
 
 /**
@@ -3869,7 +4072,7 @@ void hogs_to_humans()
                                  any == human ? "human" : "original",
                                  any > 1 ? "forms" : "form");
     }
-    kirke_death_fineff::schedule(final_msg);
+    schedule_kirke_death_fineff(final_msg);
 }
 
 /**

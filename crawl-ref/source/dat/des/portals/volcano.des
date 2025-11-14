@@ -82,6 +82,9 @@ function volcano_portal (e)
     e.rtile("X = wall_volcanic")
     e.kfeat("X = rock_wall")
     e.ftile("OS = floor_rough_red")
+    if you.in_branch("Lair") then
+        e.ftile(".1@ = floor_sprouting_stone")
+    end
 end
 
 -- Destinations:
@@ -271,7 +274,8 @@ function fiery_guardians (e, intelligent, village)
                    "hell knight ; " .. goodgear .. " . chain mail " .. res)
         else
             -- "Elemental" monster pack.
-            e.mons("fire elemental w:12 / earth elemental / gargoyle w:8")
+            e.mons("fire elemental w:12 / gargoyle / " ..
+                   "patrolling earth elemental w:8")
             e.mons("efreet / obsidian bat w:4")
             e.mons("stone giant")
         end
@@ -1075,8 +1079,8 @@ TAGS:   no_item_gen no_monster_gen
 ORIENT: encompass
 WEIGHT: 20
 MONS:   lindwurm, efreet
-MONS:   molten gargoyle w:40 / earth elemental w:38 / \
-        toenail golem w:2 / obsidian bat w:2
+MONS:   molten gargoyle w:40 / gargoyle w:28 /  \
+        patrolling earth elemental / toenail golem w:2 / obsidian bat w:2
 MONS:   fire elemental / nothing w:6
 KFEAT:  K = l
 NSUBST: R = 2:1 / * = ll'
@@ -1090,7 +1094,7 @@ MARKER: J = lua:fog_machine { size = 3, pow_min = 7, pow_max = 7, delay = 80, \
 MARKER: K = lua:fog_machine { size = 3, pow_min = 7, pow_max = 7, delay = 80, \
                                   start_clouds = 1, cloud_type = "flame", excl_rad = -1 }
 COLOUR: m = blue
-# Left side has lindwurms and constructs, right side has elementals.
+# Left side has lindwurms and earthy constructs, right side has fire elementals.
 MAP
       xxxxxxxxx
      xxKlllllKxx
@@ -1423,7 +1427,7 @@ MONS:   human ; mace ego:flaming . robe ego:fire_resistance
 MONS:   occultist ; mace ego:flaming . robe ego:fire_resistance
 MONS:   orc sorcerer, toenail golem
 MONS:   dancing weapon ; mace ego:flaming
-KFEAT:  h = cache of fruit
+KFEAT:  h = cache_of_fruit
 KFEAT:  K = w
 : place_chained_volcano(_G)
 SUBST:  h = hhw
@@ -1546,7 +1550,7 @@ MONS:    ogre w:5 / two-headed ogre w:5 / steam dragon w:5 / wyvern / \
 MONS:    patrolling fire bat band
 KMONS:   p = plant
 KITEM:   C = human skeleton
-KFEAT:   F = cache of fruit
+KFEAT:   F = cache_of_fruit
 NSUBST:  G = 1:2 / *:3, H = 1:2 / *:3, I = 1:2 / *:3
 # fixed loot types for the cave, but shuffle it a little
 SHUFFLE: def

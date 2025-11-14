@@ -512,7 +512,7 @@ static void _player_hurt_monster(monster &mon, int damage, beam_type flavour,
 {
     ASSERT(mon.alive() || !god_conducts);
 
-    if (never_harm_monster(&you, mon, true))
+    if (never_harm_monster(&you, mon, !quiet))
         return;
 
     god_conduct_trigger conducts[3];
@@ -951,7 +951,7 @@ string airstrike_intensity_display(int empty_space, tileidx_t& tile)
 
 spret cast_airstrike(int pow, coord_def target, bool fail)
 {
-    if (cell_is_solid(target))
+    if (cell_is_invalid_target(target))
     {
         canned_msg(MSG_UNTHINKING_ACT);
         return spret::abort;
@@ -1013,7 +1013,7 @@ dice_def base_airstrike_damage(int pow, bool random)
     return dice_def(2, (pow + 13) / 14);
 }
 
-string describe_airstrike_dam(dice_def dice)
+string describe_player_airstrike_dam(dice_def dice)
 {
     return make_stringf("%dd(%d-%d)", dice.num, dice.size,
                         dice.size + MAX_AIRSTRIKE_BONUS);
@@ -1026,7 +1026,7 @@ string describe_resonance_strike_dam(dice_def dice)
 
 spret cast_momentum_strike(int pow, coord_def target, bool fail)
 {
-    if (cell_is_solid(target))
+    if (cell_is_invalid_target(target))
     {
         canned_msg(MSG_UNTHINKING_ACT);
         return spret::abort;
@@ -1103,7 +1103,7 @@ static ai_action::goodness _fire_permafrost_at(const actor &agent, int pow,
 
 bool mons_should_fire_permafrost(int pow, const actor &agent)
 {
-    set<coord_def> targets = permafrost_targets(agent, pow, false);
+    set<coord_def> targets = permafrost_targets(agent, false);
     bool ever_good = false;
     for (auto target : targets)
     {
@@ -1116,11 +1116,11 @@ bool mons_should_fire_permafrost(int pow, const actor &agent)
     return ever_good;
 }
 
-set<coord_def> permafrost_targets(const actor &caster, int pow, bool actual)
+set<coord_def> permafrost_targets(const actor &caster, bool actual)
 {
     set<coord_def> targets;
 
-    const int range = spell_range(SPELL_PERMAFROST_ERUPTION, pow);
+    const int range = spell_range(SPELL_PERMAFROST_ERUPTION, &caster);
     vector<coord_def> all_hostiles = find_near_hostiles(range, actual, caster);
     if (all_hostiles.empty())
         return targets;
@@ -1153,7 +1153,7 @@ set<coord_def> permafrost_targets(const actor &caster, int pow, bool actual)
 
 spret cast_permafrost_eruption(actor &caster, int pow, bool fail)
 {
-    set<coord_def> maybe_targets = permafrost_targets(caster, pow, true);
+    set<coord_def> maybe_targets = permafrost_targets(caster, true);
     if (caster.is_player())
     {
         set<coord_def> maybe_victims(maybe_targets.begin(), maybe_targets.end());
@@ -1253,14 +1253,17 @@ static const map<monster_type, monster_frag> fraggable_monsters = {
     // there are so many of them, it seems wrong to have them be so harmful to
     // their own allies. This could be wrong!
     { MONS_SALTLING,          { "salt crystal", WHITE } },
+    { MONS_PILLAR_OF_SALT,    { "salt crystal", WHITE } },
     { MONS_PILE_OF_DEBRIS,    { "stone", LIGHTGRAY } },
     { MONS_PETRIFIED_FLOWER,  { "stone", LIGHTGRAY } },
     { MONS_EARTH_ELEMENTAL,   { "rock", BROWN } },
+    { MONS_MOUNTAINSHELL,     { "rock", BROWN } },
     { MONS_ROCKSLIME,         { "rock", BROWN } },
     { MONS_BOULDER,           { "rock", BROWN } },
     { MONS_USHABTI,           { "rock", BROWN } },
     { MONS_STATUE,            { "rock", BROWN } },
     { MONS_GARGOYLE,          { "rock", BROWN } },
+    { MONS_ROCK_FISH,         { "rock", BROWN } },
     { MONS_VV,                { "rock", BROWN } },
     { MONS_HELLFIRE_MORTAR,   { "rock", BROWN } },
     { MONS_CRAWLING_FLESH_CAGE, { "metal", CYAN, frag_damage_type::metal } },
@@ -1910,7 +1913,7 @@ spret cast_scorch(const actor& agent, int pow, bool fail)
 {
     fail_check();
 
-    const int range = spell_range(SPELL_SCORCH, pow);
+    const int range = spell_range(SPELL_SCORCH, &agent);
     auto targeter = make_unique<targeter_scorch>(agent, range, true);
     actor *targ = nullptr;
     int seen = 0;
@@ -1946,7 +1949,7 @@ spret cast_scorch(const actor& agent, int pow, bool fail)
 
     // XXX: interact with clouds of cold?
     // XXX: dedup with beam::affect_place_clouds()?
-    if (feat_is_water(env.grid(p)) && !cloud_at(p))
+    if (feat_is_water(env.grid(p)))
         place_cloud(CLOUD_STEAM, p, 2 + random2(5), &agent, 11);
 
     if (!targ->alive())
@@ -2078,7 +2081,7 @@ spret cast_irradiate(int powc, actor &caster, bool fail)
     if (caster.is_player() && stop_attack_prompt(hitfunc, "irradiate", vulnerable))
         return spret::abort;
 
-    if (warn_about_contam_cost(400))
+    if (caster.is_player() && warn_about_contam_cost(400))
         return spret::abort;
 
     fail_check();
@@ -2375,6 +2378,22 @@ static int _ignite_ally_harm(const coord_def &where)
 }
 
 /**
+ * Would casting Ignite Poison possibly harm one of the agent's enemies in the
+ * given cell?
+ *
+ * @param  where    The cell in question.
+ * @param  agent    The caster.
+ * @return          1 if there's potential harm, 0 otherwise.
+ */
+static int _ignite_enemy_harm(const coord_def &where, actor* agent)
+{
+    return (_ignite_poison_clouds(where, -1, agent) > 0)   ? 1 :
+           (_ignite_poison_monsters(where, -1, agent) > 0) ? 1 :
+           (_ignite_poison_bog(where, -1, agent) > 0)      ? 1 :
+            0;
+}
+
+/**
  * Let the player choose to abort a casting of ignite poison, if it seems
  * like a bad idea. (If they'd ignite themself.)
  *
@@ -2423,6 +2442,24 @@ bool ignite_poison_affects_cell(const coord_def where, actor* agent)
 }
 
 /**
+ * Estimate the amount of 'work' Ignite Poison would do if cast now.
+ *
+ * This is the expected damage to enemies, minus the expected damage to allies.
+ *
+ * @param agent     The caster
+ * @return          The expected work done
+*/
+int ignite_poison_net_work(actor* agent)
+{
+    return apply_area_visible([agent] (coord_def where) {
+        return _ignite_poison_clouds(where, -1, agent)
+             + _ignite_poison_monsters(where, -1, agent)
+             + _ignite_poison_player(where, -1, agent)
+             + _ignite_poison_bog(where, -1, agent);
+    }, agent->pos());
+}
+
+/**
  * Cast the spell Ignite Poison, burning poisoned creatures and poisonous
  * clouds in LOS.
  *
@@ -2443,15 +2480,12 @@ spret cast_ignite_poison(actor* agent, int pow, bool fail, bool tracer)
 {
     if (tracer)
     {
-        // Estimate how much useful effect we'd get if we cast the spell now
-        const int work = apply_area_visible([agent] (coord_def where) {
-            return _ignite_poison_clouds(where, -1, agent)
-                 + _ignite_poison_monsters(where, -1, agent)
-                 + _ignite_poison_player(where, -1, agent)
-                 + _ignite_poison_bog(where, -1, agent);
+        // Count how many enemies may be harmed by the casting.
+        const int harmed = apply_area_visible([agent] (coord_def where) {
+            return _ignite_enemy_harm(where, agent);
         }, agent->pos());
 
-        return work > 0 ? spret::success : spret::abort;
+        return harmed > 0 ? spret::success : spret::abort;
     }
 
     if (agent->is_player())
@@ -2578,7 +2612,7 @@ spret cast_ignition(const actor *agent, int pow, bool fail)
     {
         for (adjacent_iterator ai(pos); ai; ++ai)
         {
-            if (cell_is_solid(*ai)
+            if (cell_is_invalid_target(*ai)
                 && (!beam_actual.can_affect_wall(*ai)
                     || you_worship(GOD_FEDHAS)))
             {
@@ -2934,7 +2968,8 @@ vector<coord_def> arcjolt_targets(const actor &agent, bool actual)
     vector<coord_def> to_check;
     to_check.push_back(agent.pos());
 
-    for (radius_iterator ri(agent.pos(), 2, C_SQUARE, LOS_NO_TRANS, true); ri; ++ri)
+    const int range = spell_range(SPELL_ARCJOLT, &agent);
+    for (radius_iterator ri(agent.pos(), range, C_SQUARE, LOS_NO_TRANS, true); ri; ++ri)
         to_check.push_back(*ri);
 
     return _get_chain_targets(agent, to_check, actual);
@@ -3013,7 +3048,7 @@ vector<coord_def> plasma_beam_paths(coord_def source, const vector<coord_def> &t
 
 vector<coord_def> plasma_beam_targets(const actor &agent, int pow, bool actual)
 {
-    const int range = spell_range(SPELL_PLASMA_BEAM, pow);
+    const int range = spell_range(SPELL_PLASMA_BEAM, &agent, pow);
     int maxdist = 0;
     vector<actor*> target_actors;
     vector <coord_def> targets;
@@ -3184,6 +3219,7 @@ spret cast_golden_breath(bolt& beam, int power, bool fail)
 {
     bolt tracer = beam;
 
+    tracer.pierce = true;
     tracer.set_is_tracer(true);
     tracer.fire();
 
@@ -3271,7 +3307,7 @@ spret cast_thunderbolt(actor *caster, int pow, coord_def aim, bool fail)
     if (!in_bounds(prev))
         charges = 0;
 
-    targeter_thunderbolt hitfunc(caster, spell_range(SPELL_THUNDERBOLT, pow),
+    targeter_thunderbolt hitfunc(caster, spell_range(SPELL_THUNDERBOLT, caster),
                                  prev);
     hitfunc.set_aim(aim);
 
@@ -3584,7 +3620,8 @@ void toxic_radiance_effect(actor* agent, int mult, bool on_cast)
             else
                 ai->hurt(agent, dam, BEAM_POISON);
 
-            if (ai->alive())
+            if (ai->alive() && (!never_harm_monster(&you, *ai->as_monster(), false)
+                                || !agent->is_player()))
             {
                 behaviour_event(ai->as_monster(), ME_ANNOY, agent,
                                 agent->pos());
@@ -3609,7 +3646,7 @@ static void _setup_unravelling(bolt &beam, int pow, coord_def target)
 
 spret cast_unravelling(coord_def target, int pow, bool fail)
 {
-    if (cell_is_solid(target))
+    if (cell_is_invalid_target(target))
     {
         canned_msg(MSG_UNTHINKING_ACT);
         return spret::abort;
@@ -3689,7 +3726,7 @@ string mons_inner_flame_immune_reason(const monster *mons)
 
 spret cast_inner_flame(coord_def target, int pow, bool fail)
 {
-    if (cell_is_solid(target))
+    if (cell_is_invalid_target(target))
     {
         canned_msg(MSG_UNTHINKING_ACT);
         return spret::abort;
@@ -3817,7 +3854,7 @@ void handle_flame_wave(int lvl)
         finalize_mp_cost();
     }
 
-    if (lvl >= spell_range(SPELL_FLAME_WAVE, pow))
+    if (lvl >= spell_range(SPELL_FLAME_WAVE, &you))
     {
         mpr("Your wave of flame reaches its maximum intensity and dissipates.");
         stop_channelling_spells(true);
@@ -3885,7 +3922,7 @@ bool handle_searing_ray(actor& agent, int turn)
 
     bolt beam;
     beam.thrower = agent.is_player() ? KILL_YOU_MISSILE : KILL_MON_MISSILE;
-    beam.range   = calc_spell_range(SPELL_SEARING_RAY, pow);
+    beam.range   = spell_range(SPELL_SEARING_RAY, &agent);
     beam.source  = agent.pos();
     beam.target  = agent.props[SEARING_RAY_TARGET_KEY].get_coord();
 
@@ -3971,7 +4008,7 @@ dice_def glaciate_damage(int pow, int eff_range)
 
 spret cast_glaciate(actor *caster, int pow, coord_def aim, bool fail)
 {
-    const int range = spell_range(SPELL_GLACIATE, pow);
+    const int range = spell_range(SPELL_GLACIATE, caster, pow);
     targeter_cone hitfunc(caster, range);
     hitfunc.set_aim(aim);
 
@@ -4058,7 +4095,7 @@ spret cast_glaciate(actor *caster, int pow, coord_def aim, bool fail)
 
 spret cast_starburst(int pow, bool fail, bool is_tracer)
 {
-    int range = spell_range(SPELL_STARBURST, pow);
+    int range = spell_range(SPELL_STARBURST, &you);
 
     vector<coord_def> offsets = { coord_def(range, 0),
                                 coord_def(range, range),
@@ -4100,7 +4137,7 @@ spret cast_starburst(int pow, bool fail, bool is_tracer)
         fire_partial_player_tracer(ZAP_BOLT_OF_FIRE, pow, tracer, beam);
     }
 
-    if (cancel_beam_prompt(beam, tracer))
+    if (cancel_beam_prompt(beam, tracer, 8))
         return spret::abort;
 
     fail_check();
@@ -4241,7 +4278,7 @@ void seeker_attack(monster& seeker, actor& target)
     beam.hit_verb = (seeker.type == MONS_FOXFIRE ? "burns" : "hits");
     beam.fire();
 
-    check_place_cloud(seeker_trail_type(seeker), seeker.pos(), 2, &seeker);
+    place_cloud(seeker_trail_type(seeker), seeker.pos(), 2, &seeker);
 
     if (target.alive() && seeker.type == MONS_SHOOTING_STAR)
         target.knockback(seeker, 1, 0, "");
@@ -4275,7 +4312,7 @@ static void _hailstorm_cell(coord_def where, int pow, actor *agent)
 
 spret cast_hailstorm(int pow, bool fail, bool tracer)
 {
-    const int range = calc_spell_range(SPELL_HAILSTORM, pow);
+    const int range = spell_range(SPELL_HAILSTORM, &you);
     // used only for vulnerability check, not for the actual targeting
     auto hitfunc = find_spell_targeter(SPELL_HAILSTORM, pow, range);
     bool (*vulnerable) (const actor *) = [](const actor * act) -> bool
@@ -4354,7 +4391,7 @@ static void _imb_actor(actor * act, int pow, coord_def source)
 
 spret cast_imb(int pow, bool fail)
 {
-    int range = spell_range(SPELL_ISKENDERUNS_MYSTIC_BLAST, pow);
+    int range = spell_range(SPELL_ISKENDERUNS_MYSTIC_BLAST, &you);
     auto hitfunc = find_spell_targeter(SPELL_ISKENDERUNS_MYSTIC_BLAST, pow, range);
 
     bool (*vulnerable) (const actor *) = [](const actor * act) -> bool
@@ -4401,16 +4438,20 @@ void actor_apply_toxic_bog(actor * act)
     if (env.grid(act->pos()) != DNGN_TOXIC_BOG)
         return;
 
-    if (!act->ground_level())
+    if (act->airborne())
         return;
 
     const bool player = act->is_player();
     monster *mons = !player ? act->as_monster() : nullptr;
 
-    if (mons && mons->type == MONS_FENSTRIDER_WITCH)
-        return; // stilting above the muck!
+    if (mons &&
+        (mons->type == MONS_FENSTRIDER_WITCH  // stilting above the muck!
+         || mons->type == MONS_ORC_APOSTLE))  // walking on top of it
+    {
+        return;
+    }
 
-    if (player && you.duration[DUR_NOXIOUS_BOG])
+    if (player && (you.duration[DUR_NOXIOUS_BOG] || you.can_water_walk()))
         return;
 
     actor *oppressor = nullptr;
@@ -4480,8 +4521,8 @@ vector<coord_def> find_ramparts_walls()
 {
     vector<coord_def> wall_locs;
     for (radius_iterator ri(you.pos(),
-            spell_range(SPELL_FROZEN_RAMPARTS, -1), C_SQUARE,
-                                                    LOS_NO_TRANS, true);
+            spell_range(SPELL_FROZEN_RAMPARTS, &you), C_SQUARE,
+                                                      LOS_NO_TRANS, true);
         ri; ++ri)
     {
         const auto feat = env.grid(*ri);
@@ -4537,7 +4578,7 @@ void end_frozen_ramparts()
     const auto &pos = you.props[FROZEN_RAMPARTS_KEY].get_coord();
     ASSERT(in_bounds(pos));
 
-    for (radius_iterator ri(pos, spell_range(SPELL_FROZEN_RAMPARTS, -1),
+    for (radius_iterator ri(pos, spell_range(SPELL_FROZEN_RAMPARTS, &you),
                             C_SQUARE, false); ri; ri++)
     {
         env.pgrid(*ri) &= ~FPROP_ICY;
@@ -4648,7 +4689,7 @@ static void _discharge_maxwells_coupling()
         // need to do this here, because react_to_damage is never called
         mprf("A cloud of jellies burst out of %s as the current"
              " ripples through it%s", mon->name(DESC_THE).c_str(), attack_punctuation.c_str());
-        trj_spawn_fineff::schedule(&you, mon, mon->pos(), mon->hit_points);
+        schedule_trj_spawn_fineff(&you, mon, mon->pos(), mon->hit_points);
     }
     else
         mprf("The electricity discharges through %s%s", mon->name(DESC_THE).c_str(), attack_punctuation.c_str());
@@ -4690,10 +4731,10 @@ void handle_maxwells_coupling()
     mpr("You feel charge building up...");
 }
 
-vector<coord_def> find_bog_locations(const coord_def &center, int pow)
+vector<coord_def> find_bog_locations(const coord_def &center)
 {
     vector<coord_def> bog_locs;
-    const int radius = spell_range(SPELL_NOXIOUS_BOG, pow);
+    const int radius = spell_range(SPELL_NOXIOUS_BOG, &you);
 
     for (radius_iterator ri(center, radius, C_SQUARE, LOS_NO_TRANS); ri; ri++)
     {
@@ -4718,7 +4759,7 @@ vector<coord_def> find_bog_locations(const coord_def &center, int pow)
 }
 spret cast_noxious_bog(int pow, bool fail)
 {
-    vector <coord_def> bog_locs = find_bog_locations(you.pos(), pow);
+    vector <coord_def> bog_locs = find_bog_locations(you.pos());
     if (bog_locs.empty())
     {
         mpr("There are no places for you to create a bog.");
@@ -5247,7 +5288,7 @@ void unleash_fortress_blast(actor& caster)
     blast.target = caster.pos();
     blast.origin_spell = SPELL_FORTRESS_BLAST;
     blast.is_explosion = true;
-    blast.ex_size = spell_range(SPELL_FORTRESS_BLAST, 0);
+    blast.ex_size = spell_range(SPELL_FORTRESS_BLAST, &caster);
 
     blast.explode(true, true);
 }

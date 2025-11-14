@@ -271,11 +271,12 @@ static string mi_calc_draining_gaze_drain(monster* mons)
     return make_stringf("0-%d MP", pow / 8);
 }
 
-static string mi_calc_airstrike_damage(monster* mons)
+static string mi_calc_airstrike_damage(monster* mons, spell_type spell_cast)
 {
-    const int pow = mons_power_for_hd(SPELL_AIRSTRIKE, mons->get_hit_dice());
+    const int pow = mons_power_for_hd(spell_cast, mons->get_hit_dice());
     dice_def dice = base_airstrike_damage(pow);
-    return describe_airstrike_dam(dice);
+    return make_stringf("%dd%d+(%d/space)", dice.num, dice.size,
+                        spell_cast == SPELL_SLEETSTRIKE ? 3 : 2);
 }
 
 static string mi_calc_glaciate_damage(monster* mons)
@@ -360,7 +361,8 @@ static string mons_human_readable_spell_damage_string(monster* monster,
         case SPELL_DRAINING_GAZE:
             return mi_calc_draining_gaze_drain(monster);
         case SPELL_AIRSTRIKE:
-            return mi_calc_airstrike_damage(monster);
+        case SPELL_SLEETSTRIKE:
+            return mi_calc_airstrike_damage(monster, sp);
         case SPELL_GLACIATE:
             return mi_calc_glaciate_damage(monster);
         case SPELL_CHAIN_LIGHTNING:
@@ -975,7 +977,6 @@ int main(int argc, char* argv[])
         mon.wield_melee_weapon();
         for (int x = 0; x < 4; x++)
         {
-            mon_attack_def orig_attk(me->attack[x]);
             int attack_num = x;
             if (mon.has_hydra_multi_attack())
                 attack_num = x == 0 ? x : x + mon.number - 1;
@@ -1285,6 +1286,7 @@ int main(int argc, char* argv[])
         mons_check_flag(mon.is_unbreathing(), monsterflags, "unbreathing");
         mons_check_flag(mon.is_insubstantial(), monsterflags, "insubstantial");
         mons_check_flag(mon.is_amorphous(), monsterflags, "amorphous");
+        mons_check_flag(bool(me->bitfields & M_WARDED), monsterflags, "warded");
 
         string spell_string = construct_spells(spell_lists, damages);
         if (shapeshifter || mon.type == MONS_PANDEMONIUM_LORD

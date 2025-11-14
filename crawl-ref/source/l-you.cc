@@ -217,7 +217,7 @@ LUARET1(you_dexterity, number, you.dex(false))
 
 /*** XL.
  * @treturn int xl
- * @tfunction xl
+ * @function xl
  */
 LUARET1(you_xl, number, you.experience_level)
 
@@ -251,6 +251,19 @@ LUAFN(you_can_train_skill)
     if (sk > NUM_SKILLS)
         return 0;
     PLUARET(boolean, you.can_currently_train[sk]);
+}
+
+/*** Is this skill useless (removed, sacrificed, or unusable) to the player?
+ * @tparam string name skill name
+ * @treturn boolean
+ * @function is_useless_skill
+ */
+LUAFN(you_is_useless_skill)
+{
+    skill_type sk = l_skill(ls);
+    if (sk > NUM_SKILLS)
+        return 0;
+    PLUARET(boolean, is_useless_skill(sk));
 }
 
 /*** Best skill.
@@ -612,7 +625,6 @@ LUARET1(you_depth_fraction, number,
 // [ds] Absolute depth is 1-based for Lua to match things like DEPTH:
 // which are also 1-based. Yes, this is confusing. FIXME: eventually
 // change you.absdepth0 to be 1-based as well.
-// [1KB] FIXME: eventually eliminate the notion of absolute depth at all.
 LUARET1(you_absdepth, number, env.absdepth0 + 1)
 
 /*** How long has the player been on the current level?
@@ -913,62 +925,51 @@ static int l_you_memorise(lua_State *ls)
     PLUARET(boolean, learn_spell(s, false, false));
 }
 
-/*** Available abilities
- * @treturn array An array of ability names.
- * @function abilities
+/*** Ability information.
+ * @treturn array|nil A nested table with info about the abilities you have.
+ * Returns nil if you do not have any abilities (or the provided ability).
+ * Each entry contains a table with the following:
+ *     { string name, boolean currently_usable, string hotkey }
+ * @tparam[opt] string name If provided, get info for a specific ability.
+ * @function ability_info
  */
-static int l_you_abils(lua_State *ls)
+LUAFN(you_get_ability_info)
 {
-    lua_newtable(ls);
+    string abil_name = "";
+    if (lua_gettop(ls) >= 1)
+        abil_name = luaL_checkstring(ls, 1);
 
-    vector<string>abils = get_ability_names();
-    for (int i = 0, size = abils.size(); i < size; ++i)
+    const ability_type abil = ability_by_name(abil_name);
+    if (!abil_name.empty() && abil == ABIL_NON_ABILITY)
     {
-        lua_pushstring(ls, abils[i].c_str());
-        lua_rawseti(ls, -2, i + 1);
+        luaL_argerror(ls, 1, ("Invalid ability: " + abil_name).c_str());
+        return 0;
     }
-    return 1;
-}
 
-/*** Ability letters in use.
- * @treturn array An array of ability letters
- * @function ability_letters
- */
-static int l_you_abil_letters(lua_State *ls)
-{
     lua_newtable(ls);
 
     char buf[2];
     buf[1] = 0;
-
-    vector<talent> talents = your_talents(false);
-    for (int i = 0, size = talents.size(); i < size; ++i)
+    const vector<talent> talents = your_talents(true);
+    int index = 0;
+    for (const auto &tal : talents)
     {
-        buf[0] = talents[i].hotkey;
-        lua_pushstring(ls, buf);
-        lua_rawseti(ls, -2, i + 1);
-    }
-    return 1;
-}
+        if (!abil_name.empty() && abil != tal.which)
+            continue;
 
-/*** Ability table.
- * @treturn table A map of letters to ability names
- * @function ability_table
- */
-static int l_you_abil_table(lua_State *ls)
-{
-    lua_newtable(ls);
-
-    char buf[2];
-    buf[1] = 0;
-
-    for (const talent &tal : your_talents(false))
-    {
+        lua_newtable(ls);
+        lua_pushstring(ls, ability_name(tal.which).c_str());
+        lua_rawseti(ls, -2, 1);
+        lua_pushboolean(ls, check_ability_possible(tal.which, true));
+        lua_rawseti(ls, -2, 2);
         buf[0] = tal.hotkey;
         lua_pushstring(ls, buf);
-        lua_pushstring(ls, ability_name(tal.which).c_str());
-        lua_rawset(ls, -3);
+        lua_rawseti(ls, -2, 3);
+        lua_rawseti(ls, -2, ++index);
     }
+    if (index < 1)
+        lua_pushnil(ls);
+
     return 1;
 }
 
@@ -1002,13 +1003,14 @@ static int you_known_items(lua_State *ls)
 }
 
 /*** Activate an ability by name, supplying a target where relevant. If the
- * ability is not targeted, the target is ignored. An invalid target will
- * open interactive targeting.
+ * ability is not targeted, the target is ignored. An invalid target will open
+ * interactive targeting.
  *
- * @tparam string the name of the ability
+ * @tparam string name the name of the ability
  * @tparam[opt=0] number x coordinate
  * @tparam[opt=0] number y coordinate
- * @tparam[opt=false] boolean if true, aim at the target; if false, shoot past it
+ * @tparam[opt=false] boolean aimed_at_spot if true, aim at the target; if
+ * false, shoot past it.
  * @treturn boolean whether an action took place
  * @function activate_ability
  */
@@ -1155,18 +1157,22 @@ LUAFN(you_get_base_mutation_level)
 
 /*** How mutated are you?
  * Adds up the total number (including levels if requested) of mutations.
- * @tparam boolean innate include innate mutations
- * @tparam boolean levels count levels
+ * @tparam boolean normal include normal mutations
+ * @tparam boolean silver include silver-affecting innate mutations
+ * @tparam boolean all_innate include all innate mutations
  * @tparam boolean temp include temporary mutations
+ * @tparam boolean levels count mutation levels instead of number of unique mutations
  * @treturn int
  * @function how_mutated
  */
 LUAFN(you_how_mutated)
 {
-    bool innate = lua_toboolean(ls, 1); // whether to include innate mutations
-    bool levels = lua_toboolean(ls, 2); // whether to count levels
-    bool temp = lua_toboolean(ls, 3); // whether to include temporary mutations
-    int result = you.how_mutated(innate, levels, temp);
+    bool normal = lua_isboolean(ls, 1) ? lua_toboolean(ls, 1) : true;
+    bool silver = lua_isboolean(ls, 2) ? lua_toboolean(ls, 2) : false;
+    bool all_innate = lua_isboolean(ls, 3) ? lua_toboolean(ls, 3) : false;
+    bool temp = lua_isboolean(ls, 4) ? lua_toboolean(ls, 4) : false;
+    bool levels = lua_isboolean(ls, 5) ? lua_toboolean(ls, 5) : true;
+    int result = you.how_mutated(normal, silver, all_innate, temp, levels);
     PLUARET(number, result);
 }
 
@@ -1369,29 +1375,56 @@ LUAFN(you_status)
     PLUARET(string, status_effects.c_str());
 }
 
+/*** Is your quivered action valid?
+ * @treturn boolean
+ * @function quiver_valid
+ */
 LUAFN(you_quiver_valid)
 {
     PLUARET(boolean, !you.quiver_action.is_empty()
                    && you.quiver_action.get()->is_valid());
 }
 
+/*** Is your quivered action enabled?
+ * @treturn boolean
+ * @function quiver_enabled
+ */
 LUAFN(you_quiver_enabled)
 {
     PLUARET(boolean, !you.quiver_action.is_empty()
                    && you.quiver_action.get()->is_enabled());
 }
 
+/*** Does your quivered action use MP?
+ * @treturn boolean
+ * @function quiver_uses_mp
+ */
 LUAFN(you_quiver_uses_mp)
 {
     PLUARET(boolean, quiver::get_secondary_action()->uses_mp());
 }
 
+/*** Does your quivered action allow autofight?
+ * @treturn boolean
+ * @function quiver_allows_autofight
+ */
 LUAFN(you_quiver_allows_autofight)
 {
     PLUARET(boolean, quiver::get_secondary_action()->allow_autofight());
 }
 
+/*** Are you immune to webs?
+ * @treturn boolean
+ * @function is_web_immune
+ */
 LUARET1(you_is_web_immune, boolean, you.is_web_immune())
+
+/*** Do your successful stab attacks deal significantly increased damage,
+ * considering weapon type, equipment, and transformations?
+ * @treturn boolean
+ * @function has_good_stab
+ */
+LUARET1(you_has_good_stab, boolean, you.has_good_stab())
 
 static const struct luaL_reg you_clib[] =
 {
@@ -1405,9 +1438,7 @@ static const struct luaL_reg you_clib[] =
     { "spell_levels", you_spell_levels },
     { "mem_spells",   l_you_mem_spells },
     { "memorise",     l_you_memorise },
-    { "abilities"   , l_you_abils },
-    { "ability_letters", l_you_abil_letters },
-    { "ability_table", l_you_abil_table },
+    { "ability_info", you_get_ability_info },
     { "known_items" , you_known_items },
     { "name"        , you_name },
     { "species"     , you_species },
@@ -1436,6 +1467,7 @@ static const struct luaL_reg you_clib[] =
     { "base_skill"  , you_base_skill },
     { "skill_progress", you_skill_progress },
     { "can_train_skill", you_can_train_skill },
+    { "is_useless_skill", you_is_useless_skill },
     { "best_skill",   you_best_skill },
     { "unarmed_damage_rating",   you_unarmed_damage_rating},
     { "unarmed_ego",  you_unarmed_ego},
@@ -1539,6 +1571,7 @@ static const struct luaL_reg you_clib[] =
     { "quiver_allows_autofight", you_quiver_allows_autofight },
     { "activate_ability",        you_activate_ability},
     { "is_web_immune",     you_is_web_immune },
+    { "has_good_stab",      you_has_good_stab },
 
     { nullptr, nullptr },
 };
@@ -1747,7 +1780,22 @@ LUAFN(you_gain_bane)
     if (bane != NUM_BANES)
     {
         string reason = luaL_checkstring(ls, 2);
-        PLUARET(boolean, add_bane(bane, reason));
+        int mult = luaL_checkint(ls, 3);
+        PLUARET(boolean, add_bane(bane, reason, 0, mult > 0 ? mult : 100));
+    }
+
+    string err = make_stringf("No such bane: '%s'.", banename.c_str());
+    return luaL_argerror(ls, 1, err.c_str());
+}
+
+LUAFN(you_xl_to_remove_bane)
+{
+    string banename = luaL_checkstring(ls, 1);
+    bane_type bane = bane_from_name(banename);
+    if (bane != NUM_BANES)
+    {
+        int mult = luaL_checkint(ls, 2);
+        PLUARET(integer, xl_to_remove_bane(bane, mult > 0 ? mult : 100));
     }
 
     string err = make_stringf("No such bane: '%s'.", banename.c_str());
@@ -1835,7 +1883,6 @@ LUARET1(you_zigs_completed, number, you.zigs_completed)
 static const struct luaL_reg you_dlib[] =
 {
 { "hear_pos",           you_can_hear_pos },
-{ "silenced",           you_silenced },
 { "x_pos",              you_x_pos },
 { "y_pos",              you_y_pos },
 { "pos",                you_pos },
@@ -1865,6 +1912,7 @@ static const struct luaL_reg you_dlib[] =
 { "delete_temp_mutations", you_delete_temp_mutations },
 { "delete_all_mutations", you_delete_all_mutations },
 { "gain_bane",          you_gain_bane },
+{ "xl_to_remove_bane",  you_xl_to_remove_bane },
 { "apply_draining",     you_apply_draining },
 { "ostracise",          you_ostracise },
 { "change_species",     you_change_species },

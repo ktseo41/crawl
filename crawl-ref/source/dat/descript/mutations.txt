@@ -162,7 +162,7 @@ non-innate mutations, this bonus only applies every other mutation.
 You currently gain
 {{
     num = 1
-    muts = you.how_mutated(false, false, true)
+    muts = you.how_mutated(true, false, false, true, false)
     if muts > 7 then
         num = 7 + math.floor((muts - 7) / 2)
     else
@@ -185,6 +185,11 @@ You have an uncanny knack for uncovering hidden properties of items other people
 might ignore as mundane. Whenever you encounter a new item on the ground for the
 first time, there is a very tiny chance to discover that it is actually an
 artefact. Each level of this mutation increases that chance.
+%%%%
+reckless mutation
+
+Your recklessness halves your SH, but the damage you deal with two-handed
+weapons is increased by 15%.
 %%%%
 # ------ Auxes -----
 horns mutation
@@ -468,11 +473,6 @@ poor constitution mutation
 Your body reacts poorly to injury; when you suffer damage, you have a chance for
 your attacks to become weakened for a short while. The second level of this
 mutation sometimes additionally causes this to slow you as well.
-%%%%
-berserk mutation
-
-When attacking foes in melee, you sometimes enter a berserk rage. Each level of
-this mutation makes it easier for you to lose your temper.
 %%%%
 no potion heal mutation
 
@@ -1379,14 +1379,15 @@ spells.
 %%%%
 heatstroke bane
 
-When you are damaged by fire, you have a chance to become slowed for a moderate
-length of time. This chance is decreased by your current level of fire resistance.
+When you are damaged by fire, you have a high chance to become slowed for a
+moderate length of time. This chance is decreased by your current level of fire
+resistance.
 %%%%
 snow-blindness bane
 
-When you are damaged by cold, you have a chance to become weak and blind for a
-moderate length of time. This chance is decreased by your current level of cold
-resistance.
+When you are damaged by cold, you have a high chance to become weak and blind
+for a moderate length of time. This chance is decreased by your current level of
+cold resistance.
 %%%%
 electrospasm bane
 
@@ -1403,10 +1404,6 @@ stumbling bane
 
 Your evasion is decreased by 25 on any turn where you either moved or waited in
 place without doing anything else.
-%%%%
-reckless bane
-
-Your SH is always equal to 0 and cannot be raised by any means.
 %%%%
 succour bane
 

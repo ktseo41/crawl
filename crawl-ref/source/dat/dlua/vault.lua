@@ -31,8 +31,13 @@ end
 -- D/F opposite/adjacent vault entrances, that may or may not be there
 -- E/H placed in front of the alternate doors. become w tiles if there's no door there
 
-function ks_random_setup(e, norandomexits)
+function ks_random_setup(e, extra, norandomexits)
     e.tags("no_pool_fixup")
+    if extra then
+      e.tags("extra")
+      e.depth_weight("Depths", 5)
+      e.depth_weight("D", 10)
+    end
     -- 1/2 chance the adjacent door is there, followed by a 1/2 chance every
     -- side has a door.
     if norandomexits == nil then
@@ -117,10 +122,10 @@ end
 -- should guarantee that `D` is present.
 function serpent_of_hell_setup(e)
   local b = soh_hangout()
-  if not you.uniques("the Serpent of Hell")
+  if not you.uniques("Serpent of Hell")
         and you.in_branch(b)
         and you.depth() == dgn.br_depth(b) then
-    e.kmons('D = the Serpent of Hell')
+    e.kmons('D = Serpent of Hell')
   end
 end
 
@@ -200,6 +205,21 @@ function master_elementalist_setup(e, sprintscale)
            "ozocubu's_refrigeration.11.wizard;" ..
            "haste.11.wizard;" ..
            "repel_missiles.11.wizard" .. equip_def .. " . ring of willpower"
+end
+
+-- A handy boilerplate-reducing function for getting a cloud generator to place
+-- just a single cloud in-place. @fade makes it rarely briefly fade away.
+function single_cloud(e, glyph, cloud, fade)
+  local pow = ""
+  if fade == nil then fade = false end
+  if fade then
+    pow = "pow_min = 5, pow_max = 7, delay_min = 55, delay_max = 75, excl_rad = 0"
+  else
+    pow = "pow_min = 90, pow_max = 100, delay = 10, excl_rad = -1"
+  end
+  e.marker(glyph .. ' = lua:fog_machine { cloud_type = "' .. cloud .. '", ' ..
+          "size = 1, " .. pow .. ", walk_dist = 0, " ..
+          "start_clouds = 1, spread_rate = 0 }")
 end
 
 -- A function to crunch down decorative skeletons.
@@ -297,7 +317,8 @@ function decorative_floor (e, glyph, type)
     ["fur brush"] = {"brown", "dngn_yak_fur"},
     ["set of bottled spirits"] = {"lightgreen", "dngn_bottled_spirits"},
     ["mop and bucket"] = {"lightblue", "dngn_mop"},
-    ["bloodied mop and bucket"] = {"lightred", "dngn_mop_bloody"}
+    ["bloodied mop and bucket"] = {"lightred", "dngn_mop_bloody"},
+    ["weapon-inlaid floor"] = {"lightgrey", "floor_blade"}
   }
 
   for name, contents in pairs(dec) do
@@ -310,6 +331,13 @@ function decorative_floor (e, glyph, type)
   e.set_feature_name('decorative_floor', type)
 end
 
+-- The animation implementation for these tiles needs to be each discrete
+-- tiles, alas, so to help shorten its use, just use this each time.
+function crackle_def(e)
+  return "wall_stone_crackle_1 / wall_stone_crackle_2 / " ..
+         "wall_stone_crackle_3 / wall_stone_crackle_4"
+end
+
 -- A reusable poison / fire / snake theming for statues that show up in Snake.
 function snake_statue_setup (e, glyph)
   if crawl.x_chance_in_y(2, 3) then
@@ -318,6 +346,26 @@ function snake_statue_setup (e, glyph)
     vault_metal_statue_setup(e, glyph, "fiery conduit")
   end
   e.tile("G : dngn_statue_naga / dngn_statue_archer w:7")
+end
+
+-- A function for standardizing some tags and some floor tiles for vaults_hard
+-- subvaults.
+function vaults_hard_standard(e, ngen, ft)
+  e.tags('vaults_hard')
+  if ngen == nil then
+    ngen = false
+  end
+  if ngen then
+    e.tags('no_monster_gen')
+    e.tags('no_item_gen')
+  end
+  if you.in_branch("Vaults") then
+    if not ft then
+      e.ftile('0123456789._^~$%*|defghijkmnFGITUVY+mn{([<})]}> = floor_metal_gold')
+    else
+      e.ftile(ft .. ' = floor_metal_gold')
+    end
+  end
 end
 
 -- A function that uses what's in the mon-pick-data (and bands) for V in 0.32
@@ -365,7 +413,7 @@ function index_vaults_room_themes (e, set, hard)
                 'long sword ' .. f .. ' no_pickup/ ' ..
                 'mace ' .. f .. ' no_pickup')
     e.kitem('e = robe ' .. c .. ' / leather armour ' .. c)
-    e.kfeat('m = cache of meat')
+    e.kfeat('m = cache_of_meat')
     e.kfeat('I = rock_wall')
     e.tile('I = wall_ice_block')
     e.tile('v = dngn_metal_wall_lightblue')
@@ -383,8 +431,8 @@ function index_vaults_room_themes (e, set, hard)
            'entropy weaver w:' .. 2 + d * 3 .. ' / ' ..
            'ironbound beastmaster w:' .. -2 + d * 4)
     e.kmons('S = bush')
-    e.kfeat('F = cache of fruit')
-    e.ftile('`SF = floor_lair')
+    e.kfeat('F = cache_of_fruit')
+    e.ftile('`SF = floor_sprouting_stone')
     e.tile('T = dngn_fountain_novelty_fancy')
     e.kitem('d = animal skin / club / whip w:5 / quarterstaff w:5')
     decorative_floor(e, 'p', "garden patch")

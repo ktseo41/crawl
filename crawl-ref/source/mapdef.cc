@@ -48,6 +48,7 @@
 #include "stringutil.h"
 #include "tag-version.h"
 #include "terrain.h"
+#include "tileview.h"
 #include "rltiles/tiledef-dngn.h"
 #include "rltiles/tiledef-player.h"
 
@@ -145,6 +146,7 @@ static bool _map_tag_is_selectable(const string &tag)
 {
     return !Map_Flag_Names.count(tag)
            && tag.find("luniq_") != 0
+           && tag.find("buniq_") != 0
            && tag.find("uniq_") != 0
            && tag.find("ruin_") != 0
            && tag.find("chance_") != 0;
@@ -643,8 +645,8 @@ void map_lines::apply_grid_overlay(const coord_def &c, bool is_layout)
                 tile_dngn_index(name.c_str(), &floor);
                 if (colour)
                     floor = tile_dngn_coloured(floor, colour);
-                int offset = random2(tile_dngn_count(floor));
-                tile_env.flv(gc).floor = floor + offset;
+                tile_env.flv(gc).floor = floor;
+                tile_init_flavour(gc);
                 has_floor = true;
             }
 
@@ -2308,6 +2310,8 @@ bool map_def::map_already_used() const
                           get_uniq_map_tags().end())
            || has_any_tag(env.level_uniq_map_tags.begin(),
                           env.level_uniq_map_tags.end())
+           || has_any_tag(env.branch_uniq_map_tags.begin(),
+                          env.branch_uniq_map_tags.end())
            || has_any_tag(env.new_used_subvault_tags.begin(),
                           env.new_used_subvault_tags.end());
 }
@@ -3003,6 +3007,7 @@ void map_def::update_cached_tags()
     cache_minivault = has_tag("minivault");
     cache_overwritable = has_tag("overwritable");
     cache_extra = has_tag("extra");
+    cache_extra_post_overflow = has_tag("extra_post_overflow");
 }
 
 bool map_def::is_minivault() const
@@ -3030,7 +3035,13 @@ bool map_def::is_extra_vault() const
 {
 #ifdef DEBUG_TAG_PROFILING
     ASSERT(cache_extra == has_tag("extra"));
-#endif
+    ASSERT(cache_extra_post_overflow == has_tag("extra_post_overflow"));
+ #endif
+    if (cache_extra_post_overflow)
+    {
+        return level_id::current().branch != BRANCH_DUNGEON
+               || level_id::current().depth > 10;
+    }
     return cache_extra;
 }
 
@@ -3474,8 +3485,11 @@ static void _register_subvault(const string &name, const string &spaced_tags)
         env.new_used_subvault_names.insert(name);
 
     for (const string &tag : parsed_tags)
-        if (starts_with(tag, "uniq_") || starts_with(tag, "luniq_"))
+        if (starts_with(tag, "uniq_") || starts_with(tag, "luniq_")
+            || starts_with(tag, "buniq_"))
+        {
             env.new_used_subvault_tags.insert(tag);
+        }
 }
 
 static void _reset_subvault_stack(const int reg_stack)
@@ -4912,11 +4926,11 @@ item_spec item_list::get_item(int index)
     return pick_item(items[index]);
 }
 
-string item_list::add_item(const string &spec, bool fix)
+string item_list::add_item(const string &spec, bool fix, bool ignore_excluded)
 {
     error.clear();
 
-    item_spec_slot sp = parse_item_spec(spec);
+    item_spec_slot sp = parse_item_spec(spec, ignore_excluded);
     if (error.empty())
     {
         if (fix)
@@ -5856,7 +5870,7 @@ void item_list::parse_raw_name(string name, item_spec &spec)
     error = make_stringf("Bad item name: '%s'", name.c_str());
 }
 
-item_list::item_spec_slot item_list::parse_item_spec(string spec)
+item_list::item_spec_slot item_list::parse_item_spec(string spec, bool ignore_excluded)
 {
     // lowercase(spec);
 
@@ -5870,7 +5884,8 @@ item_list::item_spec_slot item_list::parse_item_spec(string spec)
             dprf(DIAG_DNGN, "Failed to parse: %s", specifier.c_str());
             continue;
         }
-        if (parsed_spec.props.exists(NO_EXCLUDE_KEY)
+        if (ignore_excluded
+            || parsed_spec.props.exists(NO_EXCLUDE_KEY)
             || !item_excluded_from_set(parsed_spec.base_type, parsed_spec.sub_type))
         {
             list.ilist.push_back(parsed_spec);

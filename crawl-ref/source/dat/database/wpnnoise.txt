@@ -284,6 +284,8 @@ w:20
 
 @Your_weapon@ tootles away.
 
+@Your_weapon@ buzzes like a kazoo.
+
 @Your_weapon@ chimes like a gong.
 
 @Your_weapon@ applauds itself.
@@ -359,6 +361,8 @@ snatches of song.
 
 a twanging sound.
 
+the buzz of a distant kazoo.
+
 the chiming of a distant gong.
 
 the tinkle of an enormous bell.
@@ -406,7 +410,7 @@ a muffled joke.
 #
 # Generally, the Sword is arrogant: it sees itself as the main hero, with the
 # wielder just being a disposable tool/fool. Also, it does not like allies --
-# all the fame belong to our steely hero!
+# all the fame belongs to our steely hero!
 #
 # There are some (occasionally modified) lines from actual songs. Those are
 # okay to use, but particularly rare.
@@ -1224,8 +1228,8 @@ w:1
 # Order of the Stick's Belkar Bitterleaf, chaotic evil ranger/barbarian halfling
 @The_weapon@ @_screams_@, "I AM A SEXY SHOELESS GOD OF WAR!"
 
-# Terry Pratchett, Foul Old Ron
-@The_weapon@ @_screams_@, "BUGGRIT, MILLENNIUM HAND AND SHRIMP!"
+# Terry Pratchett, Foul Ole Ron
+@The_weapon@ @_screams_@, "BUGRIT, MILLENNIUM HAND AND SHRIMP!"
 
 # Tolkien, Turin Turambar on Gurthang
 @The_weapon@ @_screams_@, "I AM THE IRON OF DEATH! FROM NO BLOOD WILL I SHRINK!"
@@ -1297,6 +1301,9 @@ w:1
 
 # Swedish folk song, anonymous translation
 @The_weapon@ sings, "Come roses or sage, come lovely mint, come balm..."
+
+# Jerry Reed
+@The_weapon@ sings, "Orcs got the gold mine, I got the shaft..."
 
 ############ real songs, low tension ############
 %%%%

@@ -231,7 +231,7 @@ void monster::add_enchantment_effect(const mon_enchant &ench, bool quiet)
         calc_speed();
         break;
 
-    case ENCH_DOUBLED_HEALTH:
+    case ENCH_DOUBLED_VIGOUR:
         scale_hp(2, 1);
         break;
 
@@ -330,10 +330,13 @@ void monster::add_enchantment_effect(const mon_enchant &ench, bool quiet)
         break;
 
     case ENCH_INVIS:
+        // Reveal a monster that goes invisible so that if it has just entered
+        // view but the screen hasn't redrawn with it in view, the player won't
+        // be confused by their auto explore stopping etc.
         if (testbits(flags, MF_WAS_IN_VIEW))
         {
-            went_unseen_this_turn = true;
-            unseen_pos = pos();
+            revealed_this_turn = true;
+            revealed_at_pos = pos();
         }
         break;
 
@@ -430,7 +433,7 @@ void monster::remove_enchantment_effect(const mon_enchant &me, bool quiet)
         scale_hp(3, 1);
         break;
 
-    case ENCH_DOUBLED_HEALTH:
+    case ENCH_DOUBLED_VIGOUR:
         scale_hp(1, 2);
         if (!quiet)
             simple_monster_message(*this, " excess health fades away.", true);
@@ -1413,7 +1416,7 @@ void monster::apply_enchantment(const mon_enchant &me)
     case ENCH_LOWERED_WL:
     case ENCH_TIDE:
     case ENCH_REGENERATION:
-    case ENCH_DOUBLED_HEALTH:
+    case ENCH_DOUBLED_VIGOUR:
     case ENCH_STRONG_WILLED:
     case ENCH_IDEALISED:
     case ENCH_FLIGHT:
@@ -1556,7 +1559,7 @@ void monster::apply_enchantment(const mon_enchant &me)
     // Assumption: monster::res_fire has already been checked.
     case ENCH_STICKY_FLAME:
     {
-        if (feat_is_water(env.grid(pos())) && ground_level())
+        if (feat_is_water(env.grid(pos())) && !airborne())
         {
             if (you.can_see(*this))
             {
@@ -1741,7 +1744,7 @@ void monster::apply_enchantment(const mon_enchant &me)
         // If we've gotten silenced or somehow incapacitated since we started,
         // cancel the recitation
         if (is_silenced() || cannot_act() || has_ench(ENCH_BREATH_WEAPON)
-            || confused() || asleep() || has_ench(ENCH_FEAR))
+            || confused() || asleep() || has_ench(ENCH_FEAR) || has_ench(ENCH_DAZED))
         {
             del_ench(en, true, false);
             if (you.can_see(*this))
@@ -1761,7 +1764,7 @@ void monster::apply_enchantment(const mon_enchant &me)
 
     case ENCH_CLOCKWORK_BEE_CAST:
         if (is_silenced() || cannot_act() || has_ench(ENCH_BREATH_WEAPON)
-            || confused() || asleep() || has_ench(ENCH_FEAR))
+            || confused() || asleep() || has_ench(ENCH_FEAR) || has_ench(ENCH_DAZED))
         {
             del_ench(en, true, false);
             if (you.can_see(*this))
@@ -1774,6 +1777,12 @@ void monster::apply_enchantment(const mon_enchant &me)
 
         if (decay_enchantment(en))
             launch_clockwork_bee(*this);
+        else if (you.can_see(*this))
+        {
+            mprf("%s continues winding %s clockwork bee....",
+                    name(DESC_THE).c_str(),
+                    pronoun(PRONOUN_POSSESSIVE).c_str());
+        }
         break;
 
     case ENCH_INJURY_BOND:
@@ -1888,7 +1897,8 @@ void monster::apply_enchantment(const mon_enchant &me)
 
     case ENCH_CHANNEL_SEARING_RAY:
         // If we've gotten incapacitated since we started, cancel the spell
-        if (is_silenced() || cannot_act() || confused() || asleep() || has_ench(ENCH_FEAR))
+        if (is_silenced() || cannot_act() || confused() || asleep()
+            || has_ench(ENCH_FEAR) || has_ench(ENCH_DAZED))
         {
             del_ench(en, true, false);
             if (you.can_see(*this))
@@ -2197,7 +2207,7 @@ static const char *enchant_names[] =
 #if TAG_MAJOR_VERSION == 34
     "ephemeral_infusion",
 #endif
-    "black_mark",
+    "sign_of_ruin",
 #if TAG_MAJOR_VERSION == 34
     "grand_avatar",
 #endif
@@ -2244,11 +2254,11 @@ static const char *enchant_names[] =
     "rimeblight",
     "magnetised",
     "armed",
-    "misdirected", "changed appearance", "shadowless", "doubled_health",
+    "misdirected", "changed appearance", "shadowless", "doubled_vigour",
     "grapnel", "tempered", "hatching", "blinkitis", "chaos_laced", "vexed",
-    "deep sleep", "drowsy",
-    "vampire thrall", "pyrrhic recollection", "clockwork bee cast",
-    "phalanx barrier", "figment", "paradox-touched", "warding",
+    "deep_sleep", "drowsy",
+    "vampire_thrall", "pyrrhic_recollection", "clockwork_bee_cast",
+    "phalanx_barrier", "figment", "paradox-touched", "warding",
     "diminished_spells", "orb_cooldown",
     "buggy", // NUM_ENCHANTMENTS
 };
@@ -2493,7 +2503,7 @@ int mon_enchant::calc_duration(const monster* mons,
     case ENCH_INNER_FLAME:
         return random_range(25, 35) * 10;
     case ENCH_BERSERK:
-    case ENCH_DOUBLED_HEALTH:
+    case ENCH_DOUBLED_VIGOUR:
         return (16 + random2avg(13, 2)) * 10;
     case ENCH_ROLLING:
         return random_range(10 * BASELINE_DELAY, 15 * BASELINE_DELAY);

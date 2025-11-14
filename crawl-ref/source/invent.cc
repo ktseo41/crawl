@@ -386,7 +386,7 @@ const static int modes[] =
     OSEL_GEAR,
     OBJ_POTIONS,
     OBJ_SCROLLS,
-    OSEL_EVOKABLE,
+    OSEL_EVOKABLE_ALL,
 };
 
 void InvMenu::cycle_page(int dir)
@@ -694,11 +694,6 @@ bool get_tiles_for_item(const item_def &item, vector<tile_def>& tileset, bool sh
         if (c != coord_def() && show_background && item.link != ITEM_IN_SHOP)
         {
             ch = tileidx_feature(c);
-            if (ch == TILE_FLOOR_NORMAL)
-                ch = tile_env.flv(c).floor;
-            else if (ch == TILE_WALL_NORMAL)
-                ch = tile_env.flv(c).wall;
-
             tileset.emplace_back(ch);
         }
         tileidx_t base_item = tileidx_known_base_item(idx);
@@ -1371,6 +1366,11 @@ bool item_is_selected(const item_def &i, int selector)
         return inventory_category_for(i) == INVENT_GEAR
                 || i.base_type == OBJ_MISSILES;
 
+    case OSEL_EVOKABLE_ALL:
+        return i.base_type == OBJ_WANDS
+               || i.base_type == OBJ_MISCELLANY
+               || i.base_type == OBJ_BAUBLES;
+
     default:
         return false;
     }
@@ -1474,6 +1474,8 @@ void display_inventory()
     int flags = MF_SINGLESELECT | MF_ALLOW_FORMATTING | MF_SECONDARY_SCROLL;
     if (Options.show_paged_inventory)
         flags |= MF_PAGED_INVENTORY;
+    else
+        flags |= MF_SELECT_BY_CATEGORY;
 
     InvMenu menu(flags);
     menu.load_inv_items(Options.show_paged_inventory ? OSEL_GEAR : OSEL_ANY, -1);

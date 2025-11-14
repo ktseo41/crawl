@@ -72,7 +72,7 @@ constexpr int ENKINDLE_CHARGE_COST = 40;
 #define SOLAR_EMBER_MID_KEY "solar_ember_mid"
 #define SOLAR_EMBER_REVIVAL_KEY "solar_ember_revival"
 
-#define PYROMANIA_TRIGGER_KEY "pyromania_triggers"
+#define PYROMANIA_TRIGGERED_KEY "pyromania_triggered"
 
 // display/messaging breakpoints for penalties from Ru's MUT_HORROR
 #define HORROR_LVL_EXTREME  3
@@ -535,7 +535,7 @@ public:
     bool can_swim(bool permanently = false) const;
     bool can_water_walk() const;
     int visible_igrd(const coord_def&) const;
-    bool rampaging() const override;
+    int rampaging() const override;
     bool is_banished() const override;
     bool is_sufficiently_rested(bool starting=false) const; // Up to rest_wait_percent HP and MP.
     bool is_web_immune() const override;
@@ -598,7 +598,7 @@ public:
     int shout_volume() const;
 
     int base_ac_from(const item_def &armour, int scale = 1,
-                     bool include_penalties = true) const;
+                     bool include_form = true) const;
 
     int corrosion_amount() const;
 
@@ -623,6 +623,7 @@ public:
 
     god_type  deity() const override;
     bool      alive() const override;
+    bool      alive_or_reviving() const override;
     bool      is_summoned() const override { return false; };
     bool      was_created_by(int) const override { return false; };
     bool      was_created_by(const actor&, int = SPELL_NO_SPELL) const override
@@ -680,7 +681,9 @@ public:
     bool      has_mutation(mutation_type mut, bool active_only=true) const;
     bool      has_bane(bane_type bane) const;
 
-    int       how_mutated(bool innate=false, bool levels=false, bool temp=true) const;
+    bool      has_any_mutations() const;
+    int       how_mutated(bool normal = true, bool silver = false, bool all_innate = false,
+                          bool temp = false, bool levels = true) const;
 
     int wearing(object_class_type obj_type, int sub_type,
                 bool count_plus = 0, bool check_attuned = false) const override;
@@ -688,6 +691,9 @@ public:
     int scan_artefacts(artefact_prop_type which_property,
                        vector<const item_def *> *matches = nullptr) const override;
     bool unrand_equipped(int unrand_index, bool include_melded = false) const override;
+
+    bool weapon_is_good_stab(const item_def *weapon = nullptr) const;
+    bool has_good_stab() const;
 
     int infusion_amount() const;
 
@@ -758,6 +764,7 @@ public:
     void slow_down(actor *, int str) override;
     void confuse(actor *, int strength) override;
     void weaken(const actor *attacker, int pow) override;
+    void diminish(const actor *attacker, int pow) override;
     bool strip_willpower(actor *attacker, int dur, bool quiet = false) override;
     void daze(int duration) override;
     void end_daze();
@@ -882,6 +889,12 @@ public:
     int unadjusted_body_armour_penalty(bool archery = false) const;
     int adjusted_body_armour_penalty(int scale = 1, bool archery = false) const;
     int adjusted_shield_penalty(int scale = 1) const;
+
+    // Calculate the bonus (or penalty) the player has to their defenses from
+    // temporary effects.
+    int temp_ac_mod() const;
+    int temp_ev_mod() const;
+    int temp_sh_mod() const;
 
     // Calculates total permanent AC/EV/SH if the player was/wasn't wearing a
     // given item, along with the fail rate on all their known spells.
@@ -1039,6 +1052,7 @@ bool player_effectively_in_light_armour();
 
 int player_shield_racial_factor();
 int player_armour_shield_spell_penalty();
+int player_armour_stealth_penalty();
 
 int player_movement_speed(bool check_terrain = true, bool temp = true);
 
@@ -1217,7 +1231,7 @@ void dec_ambrosia_player(int delay);
 void dec_channel_player(int delay);
 void dec_frozen_ramparts(int delay);
 void reset_rampage_heal_duration();
-void apply_rampage_heal();
+void apply_rampage_heal(int distance_moved);
 void trickster_trigger(const monster& victim, enchant_type ench);
 int trickster_bonus();
 int enkindle_max_charges();

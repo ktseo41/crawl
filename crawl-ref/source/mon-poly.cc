@@ -116,6 +116,10 @@ void monster_drop_things(monster* mons,
         if (old_halo != new_halo || old_umbra != new_umbra)
             invalidate_agrid(true);
     }
+
+    // If the monster died in a wall, try to push the items out of it.
+    if (cell_is_solid(mons->pos()))
+        dgn_check_terrain_items(mons->pos(), true, you.see_cell(mons->pos()));
 }
 
 static bool _valid_type_morph(const monster &mons, monster_type new_mclass)
@@ -232,8 +236,8 @@ void change_monster_type(monster* mons, monster_type targetc, bool do_seen)
     {
         simple_monster_message(*mons, " form twists and warps, and jellies "
                                "spill out!", true);
-        trj_spawn_fineff::schedule(nullptr, mons, mons->pos(),
-                                   mons->hit_points);
+        schedule_trj_spawn_fineff(nullptr, mons, mons->pos(),
+                                  mons->hit_points);
     }
 
     // Inform listeners that the original monster is gone.
@@ -260,27 +264,23 @@ void change_monster_type(monster* mons, monster_type targetc, bool do_seen)
         name   = "shaped Lernaean hydra";
         flags |= MF_NAME_SUFFIX;
     }
-    else if (mons->mons_species() == MONS_SERPENT_OF_HELL
-             || mons->mname == "shaped Serpent of Hell")
-    {
-        name   = "shaped Serpent of Hell";
-        flags |= MF_NAME_SUFFIX;
-    }
     else if (mons->type == MONS_ENCHANTRESS
              || mons->mname == "shaped Enchantress")
     {
         name   = "shaped Enchantress";
         flags |= MF_NAME_SUFFIX;
     }
+    else if (mons->mons_species() == MONS_SERPENT_OF_HELL
+             || mons->mname == "shaped Serpent of Hell")
+    {
+        name   = "shaped Serpent of Hell";
+        flags |= MF_NAME_SUFFIX;
+    }
     else if (!mons->mname.empty())
     {
         if (flags & MF_NAME_MASK)
-        {
             // Remove the replacement name from the new monster
-            flags = flags & ~(MF_NAME_MASK | MF_NAME_DESCRIPTOR
-                              | MF_NAME_DEFINITE | MF_NAME_SPECIES
-                              | MF_NAME_ZOMBIE | MF_NAME_NOCORPSE);
-        }
+            flags &= ~MF_ALL_NAMES;
         else
             name = mons->mname;
     }

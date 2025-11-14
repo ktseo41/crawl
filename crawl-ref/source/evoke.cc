@@ -27,6 +27,7 @@
 #include "env.h"
 #include "exercise.h"
 #include "fight.h"
+#include "fineff.h"
 #include "god-abil.h"
 #include "god-conduct.h"
 #include "god-item.h"
@@ -218,7 +219,10 @@ void zap_wand(int slot, dist *_target)
 
     // Spend MP.
     if (mp_cost)
+    {
+        stardust_orb_trigger(mp_cost);
         finalize_mp_cost();
+    }
 
     // Take off a charge (unless gadgeteer procs)
     if ((you.wearing_ego(OBJ_GIZMOS, SPGIZMO_GADGETEER)
@@ -239,7 +243,7 @@ void zap_wand(int slot, dist *_target)
     }
 
     practise_evoking(1);
-    count_action(CACT_EVOKE, EVOC_WAND);
+    count_action(CACT_EVOKE, wand.sub_type, OBJ_WANDS);
     alert_nearby_monsters();
 
     you.turn_is_over = true;
@@ -745,7 +749,7 @@ static coord_def _find_tremorstone_target(bool& see_targets)
 
     for (radius_iterator ri(you.pos(), 3, C_SQUARE, LOS_NO_TRANS, true); ri; ++ri)
     {
-        if (ri->distance_from(you.pos()) != 3 || cell_is_solid(*ri))
+        if (ri->distance_from(you.pos()) != 3 || cell_is_invalid_target(*ri))
             continue;
 
         if (num > 0)
@@ -774,7 +778,7 @@ static coord_def _find_tremorstone_target(bool& see_targets)
     for (radius_iterator ri(you.pos(), 2, C_SQUARE, LOS_NO_TRANS, true); ri; ++ri)
     {
         if (ri->distance_from(you.pos()) == 2
-            && !cell_is_solid(*ri)
+            && !cell_is_invalid_target(*ri)
             && one_chance_in(++ties))
         {
             target = *ri;
@@ -785,7 +789,7 @@ static coord_def _find_tremorstone_target(bool& see_targets)
         return target;
 
     for (adjacent_iterator ai(you.pos()); ai; ++ai)
-        if (!cell_is_solid(*ai) && one_chance_in(++ties))
+        if (!cell_is_invalid_target(*ai) && one_chance_in(++ties))
             target = *ai;
     return target;
 }
@@ -801,7 +805,7 @@ static coord_def _fuzz_tremorstone_target(coord_def center)
     coord_def chosen = center;
     int seen = 1;
     for (adjacent_iterator ai(center); ai; ++ai)
-        if (!cell_is_solid(*ai) && one_chance_in(++seen))
+        if (!cell_is_invalid_target(*ai) && one_chance_in(++seen))
             chosen = *ai;
     return chosen;
 }
@@ -1286,7 +1290,7 @@ string target_evoke_desc(const monster_info& mi, const item_def& item)
     {
         spell = spell_in_wand(static_cast<wand_type>(item.sub_type));
         power = wand_power(spell);
-        range = spell_range(spell, power, false);
+        range = calc_spell_range(spell, power, false);
     }
     else if (item.base_type == OBJ_MISCELLANY
             && item.sub_type == MISC_PHIAL_OF_FLOODS)
@@ -1375,9 +1379,9 @@ dice_def pyromania_damage(bool random, bool max)
 {
     const int power = max ? 2700 : you.skill(SK_EVOCATIONS, 100);
     if (random)
-        return zap_damage(ZAP_FIREBALL, 30 + div_rand_round(power, 25), false, true);
+        return zap_damage(ZAP_FIREBALL, 20 + div_rand_round(power, 25), false, true);
     else
-        return zap_damage(ZAP_FIREBALL, 30 + power / 25, false, false);
+        return zap_damage(ZAP_FIREBALL, 20 + power / 25, false, false);
 }
 
 int pyromania_trigger_chance(bool max)
@@ -1389,4 +1393,27 @@ int mesmerism_orb_radius(bool max)
 {
     const int skill = max ? 27 : you.skill(SK_EVOCATIONS);
     return min(2 + skill / 7, 4);
+}
+
+int stardust_orb_max(bool max)
+{
+    const int skill = max ? 27 : you.skill(SK_EVOCATIONS);
+    return 3 + skill / 2;
+}
+
+int stardust_orb_power(int mp_spent, bool max_evo)
+{
+    const int skill = max_evo ? 108 : you.skill(SK_EVOCATIONS, 4);
+    int pow = (skill + 15) * (100 + (mp_spent * 25)) / 100;
+    return pow;
+}
+
+void stardust_orb_trigger(int mp_spent)
+{
+    if (!you.duration[DUR_STARDUST_COOLDOWN]
+        && you.wearing_ego(OBJ_ARMOUR, SPARM_STARDUST))
+    {
+        schedule_stardust_fineff(&you, stardust_orb_power(mp_spent),
+                                 stardust_orb_max());
+    }
 }

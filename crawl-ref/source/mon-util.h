@@ -211,7 +211,6 @@ string mons_type_name(monster_type type, description_level_type desc);
 
 bool give_monster_proper_name(monster& mon);
 
-bool mons_flattens_trees(const monster& mon);
 size_type mons_class_body_size(monster_type mc);
 
 mon_itemuse_type mons_class_itemuse(monster_type mc);
@@ -228,7 +227,7 @@ bool mons_can_shout(monster_type mclass);
 bool mons_is_ghost_demon(monster_type mc);
 bool mons_is_unique(monster_type mc);
 bool mons_is_or_was_unique(const monster& mon);
-bool mons_is_specially_named(monster_type mc);
+bool mons_is_the(monster_type mc);
 bool mons_is_pghost(monster_type mc);
 bool mons_is_draconian_job(monster_type mc);
 bool mons_is_hepliaklqana_ancestor(monster_type mc);
@@ -495,7 +494,7 @@ tileidx_t get_mon_base_tile(monster_type mc);
 mon_type_tile_variation get_mon_tile_variation(monster_type mc);
 tileidx_t get_mon_base_corpse_tile(monster_type mc);
 
-bool mons_class_can_pass(monster_type mc, const dungeon_feature_type grid);
+bool mons_class_can_pass(monster_type mc, dungeon_feature_type grid);
 bool mons_can_open_door(const monster& mon, const coord_def& pos);
 bool mons_can_eat_door(const monster& mon, const coord_def& pos);
 bool mons_can_destroy_door(const monster& mon, const coord_def& pos);

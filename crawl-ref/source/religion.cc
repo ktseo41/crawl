@@ -192,7 +192,7 @@ const vector<vector<god_power>> & get_all_god_powers()
             { -1, ABIL_MAKHLEB_VESSEL_OF_SLAUGHTER, ""},
             { 7, ABIL_MAKHLEB_BRAND_SELF_1,
                  "Makhleb will allow you to brand your body with an infernal mark... once.",
-                 "Mahkleb will no longer allow you to brand your body with an infernal mark."},
+                 "Makhleb will no longer allow you to brand your body with an infernal mark."},
             { 7, ABIL_MAKHLEB_BRAND_SELF_2, ""},
             { 7, ABIL_MAKHLEB_BRAND_SELF_3, ""},
         },
@@ -790,7 +790,7 @@ void dec_penance(int val)
 // TODO: find out what this is duplicating & deduplicate it
 static bool _need_water_walking()
 {
-    return you.ground_level() && !you.has_mutation(MUT_MERTAIL)
+    return !you.airborne() && !you.has_mutation(MUT_MERTAIL)
            && env.grid(you.pos()) == DNGN_DEEP_WATER;
 }
 
@@ -907,7 +907,7 @@ static void _inc_penance(god_type god, int val)
         {
             if (you.duration[DUR_TROGS_HAND])
                 trog_remove_trogs_hand();
-            dismiss_divine_allies_fineff::schedule(GOD_TROG);
+            schedule_dismiss_divine_allies_fineff(GOD_TROG);
         }
         else if (god == GOD_ZIN)
         {
@@ -920,7 +920,7 @@ static void _inc_penance(god_type god, int val)
         {
             if (you.duration[DUR_DIVINE_SHIELD])
                you.duration[DUR_DIVINE_SHIELD] = 0;
-            dismiss_divine_allies_fineff::schedule(GOD_SHINING_ONE);
+            schedule_dismiss_divine_allies_fineff(GOD_SHINING_ONE);
         }
         else if (god == GOD_ELYVILON)
         {
@@ -990,7 +990,7 @@ static void _inc_penance(god_type god, int val)
                 okawaru_remove_finesse();
         }
         else if (god == GOD_BEOGH)
-            dismiss_divine_allies_fineff::schedule(GOD_BEOGH);
+            schedule_dismiss_divine_allies_fineff(GOD_BEOGH);
         else if (god == GOD_YREDELEMNUL)
         {
             you.props.erase(YRED_TORCH_POWER_KEY);
@@ -1044,9 +1044,10 @@ static void _inc_gift_timeout(int val)
 // - Whatever dead stars made cognitogaunts are out of Yred's grasp
 static const vector<random_pick_entry<monster_type>> _yred_servants =
 {
-  { -2,  5,   80, PEAK, MONS_NECROPHAGE },
-  { -1,  7,   75, PEAK, MONS_PHANTOM },
-  {  2,  9,   70, SEMI, MONS_MARROWCUDA },
+  { -2,  5,   40, PEAK, MONS_NECROPHAGE },
+  { -1,  7,   70, PEAK, MONS_PHANTOM },
+  {  2,  8,   50, PEAK, MONS_BES_KEMWAR },
+  {  3,  9,   70, SEMI, MONS_MARROWCUDA },
   {  4,  11,  145, SEMI, MONS_WIGHT },
   {  6,  13,  90, SEMI, MONS_SHADOWGHAST },
   {  8,  15,  110, SEMI, MONS_WRAITH },
@@ -1300,8 +1301,18 @@ static set<spell_type> _vehumet_eligible_gift_spells(set<spell_type> excluded_sp
 
 static int _vehumet_weighting(spell_type spell)
 {
-    int bias = 100 + destructive_elemental_preference(spell, 10);
-    return bias;
+    skill_set skills;
+    spell_skills(spell, skills);
+    if (!skills.size())
+        return 0;
+
+    int weight = 0;
+    for (skill_type sk : skills)
+        weight += you.skill(sk, 10);
+
+    weight = weight / skills.size();
+
+    return 70 + weight;
 }
 
 static spell_type _vehumet_find_spell_gift(set<spell_type> excluded_spells)
@@ -1734,7 +1745,7 @@ static string _make_ancestor_name(gender_type gender)
     const string gender_name = gender == GENDER_MALE ? " male " :
                                gender == GENDER_FEMALE ? " female " : " ";
     const string suffix = gender_name + "name";
-    const string name = getRandNameString("ancestor", suffix);
+    const string name = getRandMonNameString("ancestor" + suffix);
     return name.empty() ? make_name() : name;
 }
 
@@ -2379,7 +2390,8 @@ static void _handle_piety_gain(int old_piety)
             for (const auto& power : get_god_powers(you.religion))
             {
                 if (power.rank == rank
-                    || power.rank == 7 && can_do_capstone_ability(you.religion))
+                    || power.rank == 7 && rank == capstone_piety_rank(you.religion)
+                        && !you.one_time_ability_used[you.religion])
                 {
                     power.display(true, "You can now %s.");
     #ifdef USE_TILE_LOCAL
@@ -2625,8 +2637,8 @@ static void _handle_piety_loss(int old_piety)
             for (const auto& power : get_god_powers(you.religion))
             {
                 if (power.rank == rank
-                    || power.rank == 7 && rank == 6
-                    && !you.one_time_ability_used[you.religion])
+                    || power.rank == 7 && rank == capstone_piety_rank(you.religion)
+                        && !you.one_time_ability_used[you.religion])
                 {
                     power.display(false, "You can no longer %s.");
 #if TAG_MAJOR_VERSION == 34
@@ -2969,7 +2981,7 @@ void excommunication(bool voluntary, god_type new_god)
         break;
 
     case GOD_MAKHLEB:
-        dismiss_divine_allies_fineff::schedule(GOD_MAKHLEB);
+        schedule_dismiss_divine_allies_fineff(GOD_MAKHLEB);
         if (you.form == transformation::slaughter)
             untransform();
         break;
@@ -2977,7 +2989,7 @@ void excommunication(bool voluntary, god_type new_god)
     case GOD_TROG:
         if (you.duration[DUR_TROGS_HAND])
             trog_remove_trogs_hand();
-        dismiss_divine_allies_fineff::schedule(GOD_TROG);
+        schedule_dismiss_divine_allies_fineff(GOD_TROG);
         you.skills_to_show.insert(SK_SPELLCASTING);
         break;
 
@@ -3018,7 +3030,7 @@ void excommunication(bool voluntary, god_type new_god)
         if (you.duration[DUR_DIVINE_SHIELD])
             you.duration[DUR_DIVINE_SHIELD] = 0;
 
-        dismiss_divine_allies_fineff::schedule(GOD_SHINING_ONE);
+        schedule_dismiss_divine_allies_fineff(GOD_SHINING_ONE);
         break;
 
     case GOD_ZIN:
@@ -4157,8 +4169,8 @@ bool god_hates_spell(spell_type spell, god_type god, bool fake_spell)
 }
 
 /**
- * Checks to see if your god hates this spell (or spellcasting generally).
- * Returns a warning string if so.
+ * Checks to see if your god hates this spell, hates spellcasting in general,
+ * or punishes memorising spells. Returns a warning string if so.
  *
  * @param spell         The spell to check against
  * @param god           The god to check against
@@ -4167,6 +4179,8 @@ bool god_hates_spell(spell_type spell, god_type god, bool fake_spell)
  */
 string god_spell_warn_string(spell_type spell, god_type god)
 {
+    if (god_punishes_memorising_spells(god))
+        return "This will place you under penance!";
     if (god_hates_spellcasting(god))
         return "Your god hates spellcasting!";
     if (god_hates_spell(spell, god))

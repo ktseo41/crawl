@@ -652,7 +652,7 @@ static void _djinn_announce_spells()
     mprf("You begin with %s%s%s.", equip_str.c_str(), spacer.c_str(), spell_str.c_str());
 
     take_note(Note(NOTE_MESSAGE, 0, 0, you.your_name + " set off with " +
-                                       equip_str + spell_str + "."));
+                                       equip_str + spacer + spell_str + "."));
 }
 
 // Announce to the message log and make a note of the player's starting items,
@@ -1408,9 +1408,10 @@ static bool _can_take_stairs(dungeon_feature_type ftype, bool down,
         }
         break;
     case DNGN_ENTER_ZOT:
-        if (runes_in_pack() < 3 && !crawl_state.game_is_descent())
+        if (runes_in_pack() < ZOT_ENTRY_RUNES && !crawl_state.game_is_descent())
         {
-            mpr("You need at least three runes to enter the Realm of Zot.");
+            mprf("You need at least %d runes to enter the Realm of Zot.",
+                 ZOT_ENTRY_RUNES);
             return false;
         }
         break;
@@ -2328,15 +2329,6 @@ void process_command(command_type cmd, command_type prev_cmd)
     case CMD_EXPLORE:           do_explore_cmd();            break;
     case CMD_EXPLORE_NO_REST:   do_explore_cmd(true);        break;
 
-        // Mouse commands.
-    case CMD_MOUSE_MOVE:
-    {
-        const coord_def dest = crawl_view.screen2grid(crawl_view.mousep);
-        if (in_bounds(dest))
-            terse_describe_square(dest);
-        break;
-    }
-
     case CMD_MOUSE_CLICK:
     {
         // XXX: We should probably use specific commands such as
@@ -2599,7 +2591,6 @@ void world_reacts()
 
     check_banished();
     _check_sanctuary();
-    _check_trapped();
     check_spectral_weapon(you);
 
     run_environment_effects();
@@ -2650,6 +2641,8 @@ void world_reacts()
     clear_monster_flags();
 
     add_auto_excludes();
+
+    _check_trapped();
 
     viewwindow();
     update_screen();

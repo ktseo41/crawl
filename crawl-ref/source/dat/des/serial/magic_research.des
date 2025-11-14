@@ -131,7 +131,7 @@ KITEM:   B = large rock q:1
 COLOUR:  .xB012345D = brown
 FTILE:   .+xB012345D = floor_pebble_brown
 TILE:    x = wall_pebble_brown
-: vault_metal_statue_setup(_G, "G", "dimensional conduit")
+: vault_metal_statue_setup(_G, "G", "earthen conduit")
 : init_research(_G, 'earth')
 MAP
 @'''@'''@
@@ -173,8 +173,7 @@ KMONS:   D = bone dragon
 KITEM:   % = ugly thing skeleton
 SHUFFLE: 1234
 NSUBST:  2 = 2:2 / *:.
-MARKER:  % = lua:fog_machine { cloud_type = "black smoke", pow_min = 10, \
-                pow_max = 20, delay = 40, size = 1, walk_dist = 0 }
+: single_cloud(_G, "%", "black smoke", true)
 COLOUR:  .012345D% = w:20 lightgrey / w:5 darkgrey
 FTILE:   .+n012345D% = floor_tomb
 : init_research(_G, 'necromancy')

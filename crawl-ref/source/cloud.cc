@@ -222,7 +222,7 @@ static const cloud_data clouds[] = {
     // CLOUD_MUTAGENIC,
     { "mutagenic fog",  nullptr,                // terse, verbose name
       ETC_MUTAGENIC,                            // colour
-      { TILE_ERROR, CTVARY_NONE },              // tile
+      { TILE_ERROR, CTVARY_MUTAGENIC },         // tile
     },
     // CLOUD_MAGIC_TRAIL,
     { "magical condensation", nullptr,          // terse, verbose name
@@ -232,7 +232,7 @@ static const cloud_data clouds[] = {
     // CLOUD_VORTEX,
     { "whirling frost", nullptr,                // terse, verbose name
       ETC_VORTEX,                               // colour
-      { TILE_ERROR },                           // tile
+      { TILE_ERROR, CTVARY_VORTEX },            // tile
     },
     // CLOUD_DUST,
     { "sparse dust",  nullptr,                  // terse, verbose name
@@ -674,7 +674,7 @@ static void _maybe_leave_water(const coord_def pos)
     if (env.grid(pos) != DNGN_FLOOR || !one_chance_in(5))
         return;
 
-    if (you.pos() == pos && you.ground_level())
+    if (you.pos() == pos && !you.airborne())
         mpr("The rain has left you waist-deep in water!");
     temp_change_terrain(pos, DNGN_SHALLOW_WATER,
                         random_range(500, 1000),
@@ -745,17 +745,6 @@ void swap_clouds(coord_def p1, coord_def p2)
     _los_cloud_changed(p2, env.cloud[p2].type, env.cloud[p1].type);
 }
 
-// Places a cloud with the given stats assuming one doesn't already
-// exist at that point.
-void check_place_cloud(cloud_type cl_type, const coord_def& p, int lifetime,
-                       const actor *agent, int spread_rate, int excl_rad)
-{
-    if (!in_bounds(p) || cloud_at(p))
-        return;
-
-    place_cloud(cl_type, p, lifetime, agent, spread_rate, excl_rad);
-}
-
 bool cloud_is_stronger(cloud_type ct, const cloud_struct& cloud)
 {
     return (is_harmless_cloud(cloud.type) && !is_opaque_cloud(cloud.type))
@@ -777,27 +766,30 @@ bool cloud_is_stronger(cloud_type ct, const cloud_struct& cloud)
  *                    cloud.
  * @param do_conducts If true, apply any relevant god conducts for flame
  *                    placement.
+ *
+ * @return  Whether a cloud was actually placed at this location.
 */
-void place_cloud(cloud_type cl_type, const coord_def& ctarget, int cl_range,
+bool place_cloud(cloud_type cl_type, const coord_def& ctarget, int cl_range,
                  const actor *agent, int spread_rate, int excl_rad,
                  bool do_conducts)
 {
+    if (!in_bounds(ctarget) || cell_is_solid(ctarget))
+        return false;
+
     if (is_sanctuary(ctarget) && !is_harmless_cloud(cl_type))
-        return;
+        return false;
 
     if (cl_type == CLOUD_INK && !feat_is_water(env.grid(ctarget)))
-        return;
+        return false;
 
     if (env.level_state & LSTATE_STILL_WINDS
         && cl_type != CLOUD_VORTEX
         && cl_type != CLOUD_INK)
     {
-        return;
+        return false;
     }
 
     const monster * const mons = monster_at(ctarget);
-
-    ASSERT(!cell_is_solid(ctarget));
 
     god_conduct_trigger conducts[3];
     kill_category whose = KC_OTHER;
@@ -833,7 +825,7 @@ void place_cloud(cloud_type cl_type, const coord_def& ctarget, int cl_range,
     if (cloud && (!cloud_is_stronger(cl_type, *cloud)
                   && (cloud->type != cl_type || cloud->decay > cl_range * 10)))
     {
-        return;
+        return false;
     }
 
     // If the old cloud was opaque, may need to recalculate los. It *is*
@@ -844,6 +836,8 @@ void place_cloud(cloud_type cl_type, const coord_def& ctarget, int cl_range,
             _actual_spread_rate(cl_type, spread_rate), whose, killer, source,
             excl_rad);
     _los_cloud_changed(ctarget, env.cloud[ctarget].type, old);
+
+    return true;
 }
 
 bool is_opaque_cloud(cloud_type ctype)
@@ -990,7 +984,9 @@ bool actor_cloud_immune(const actor &act, cloud_type type)
         case CLOUD_STORM:
             return act.res_elec() >= 3;
         case CLOUD_MISERY:
-            return act.res_negative_energy() >= 3;
+            return act.res_negative_energy() >= 3
+                   || act.is_player()
+                      && have_passive(passive_t::r_misery);
         case CLOUD_VORTEX:
             return act.res_polar_vortex();
         case CLOUD_RAIN:
@@ -1863,7 +1859,8 @@ static void _spread_cloud(coord_def pos, cloud_type type, int radius, int pow,
     coord_def centre(9,9);
     for (distance_iterator di(pos, true, false); di; ++di)
     {
-        if (di.radius() > radius)
+        // Beam can still return solid cells thanks to wall monsters
+        if (cell_is_solid(*di) || di.radius() > radius)
             return;
 
         if ((exp_map(*di - pos + centre) < INT_MAX) && !cloud_at(*di)
@@ -1951,13 +1948,6 @@ void surround_actor_with_cloud(const actor* a, cloud_type cloud)
         delete_cloud(pos);
     for (adjacent_iterator ai(pos); ai; ++ai)
     {
-        const cloud_struct* existing = cloud_at(*ai);
-        // dprf("surround_actor_with_cloud x:%d y:%d solid:%d cloud_at:%s",
-        //      ai->x, ai->y, cell_is_solid(*ai), existing ? "y" : "n");
-        if (cell_is_solid(*ai))
-            continue;
-        if (existing && existing->type != cloud)
-            continue;
         const monster* mons = monster_at(*ai);
         if (mons && mons->alive() && mons_aligned(a, mons))
             continue;
@@ -2198,4 +2188,19 @@ bool chaos_affects_actor(actor* victim, actor* source)
     }
 
     return obvious_effect;
+}
+
+bool get_vortex_phase(const coord_def& loc)
+{
+    coord_def center = get_cloud_originator(loc);
+    if (center.origin())
+        return ui_random(2); // source died/went away
+    else
+    {
+        int x = loc.x - center.x;
+        int y = loc.y - center.y;
+        double dir = atan2(x, y) / PI;
+        double dist = sqrt(x * x + y * y);
+        return ((int)floor(dir * 2 + dist * 0.33 - (you.frame_no % 54) / 2.7)) & 1;
+    }
 }

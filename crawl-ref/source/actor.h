@@ -42,6 +42,7 @@ public:
     virtual god_type  deity() const = 0;
 
     virtual bool      alive() const = 0;
+    virtual bool      alive_or_reviving() const = 0;
 
     // Should return false for perma-summoned things.
     virtual bool is_summoned() const = 0;
@@ -96,7 +97,7 @@ public:
     virtual bool can_burrow() const = 0;
 
     virtual bool is_habitable_feat(dungeon_feature_type actual_grid) const = 0;
-            bool is_habitable(const coord_def &pos) const;
+    virtual bool is_habitable(const coord_def &pos) const;
 
     virtual size_type body_size(size_part_type psize = PSIZE_TORSO,
                                 bool base = false) const = 0;
@@ -199,6 +200,7 @@ public:
     virtual void put_to_sleep(actor *attacker, int duration,
                               bool hibernate = false) = 0;
     virtual void weaken(const actor *attacker, int pow) = 0;
+    virtual void diminish(const actor *attacker, int pow) = 0;
     virtual bool strip_willpower(actor *attacker, int dur,
                                  bool quiet = false) = 0;
     virtual void daze(int duration) = 0;
@@ -302,13 +304,12 @@ public:
     // Return an int so we know whether an item is the sole source.
     virtual int equip_flight() const;
     virtual int spirit_shield(bool items = true) const;
-    virtual bool rampaging() const;
+    virtual int rampaging() const;
 
     virtual bool is_banished() const = 0;
     virtual bool is_web_immune() const = 0;
     virtual bool is_binding_sigil_immune() const = 0;
     virtual bool airborne() const = 0;
-    virtual bool ground_level() const;
 
     virtual bool is_dragonkind() const;
     virtual int  dragon_level() const;

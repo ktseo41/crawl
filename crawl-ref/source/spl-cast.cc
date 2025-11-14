@@ -765,7 +765,7 @@ void do_cast_spell_cmd(bool force)
 
 static void _handle_energy_orb(int cost, spret cast_result)
 {
-    if (cast_result == spret::abort)
+    if (cast_result == spret::abort || !you.wearing_ego(OBJ_ARMOUR, SPARM_ENERGY))
         return;
 
     const int chance = player_channelling_chance();
@@ -776,13 +776,13 @@ static void _handle_energy_orb(int cost, spret cast_result)
     if (cast_result != spret::fail && !x_chance_in_y(chance, 100))
         return;
 
-    if (you.unrand_equipped(UNRAND_WUCAD_MU))
+    if (you.unrand_equipped(UNRAND_WUCAD_MU) && cast_result == spret::success)
     {
         vector<monster*> targs;
         for (monster_near_iterator mi(you.pos(), LOS_NO_TRANS); mi; ++mi)
         {
             if (mi->antimagic_susceptible() && !mi->has_ench(ENCH_ANTIMAGIC)
-                && !mi->wont_attack() & x_chance_in_y(cost, 9))
+                && !mi->wont_attack() && x_chance_in_y(cost, 9))
             {
                 targs.push_back(*mi);
                 mi->add_ench(mon_enchant(ENCH_ANTIMAGIC, 0, &you, random_range(20, 50)));
@@ -1003,7 +1003,7 @@ spret cast_a_spell(bool check_range, spell_type spell, dist *_target,
 
         if ((Options.use_animations & UA_RANGE) && Options.darken_beyond_range)
         {
-            targeter_smite range(&you, calc_spell_range(spell), 0, 0, false, true);
+            targeter_smite range(&you, spell_range(spell, &you), 0, 0, false, true);
             range_view_annotator show_range(&range);
             delay(50);
         }
@@ -1060,6 +1060,7 @@ spret cast_a_spell(bool check_range, spell_type spell, dist *_target,
     _handle_energy_orb(cost, cast_result);
     if (cast_result == spret::success)
     {
+        stardust_orb_trigger(cost);
         if (you.unrand_equipped(UNRAND_MAJIN) && one_chance_in(500))
             _majin_speak(spell);
         did_god_conduct(DID_SPELL_CASTING, 1 + random2(5));
@@ -1511,7 +1512,7 @@ unique_ptr<targeter> find_spell_targeter(spell_type spell, int pow, int range)
         return make_unique<targeter_multifireball>(&you,
                                                    _simple_find_all_hostiles());
     case SPELL_NOXIOUS_BOG:
-        return make_unique<targeter_bog>(&you, pow);
+        return make_unique<targeter_bog>(&you);
     case SPELL_FLAME_WAVE:
         return make_unique<targeter_flame_wave>(range);
     case SPELL_GOLUBRIAS_PASSAGE:
@@ -1522,7 +1523,7 @@ unique_ptr<targeter> find_spell_targeter(spell_type spell, int pow, int range)
     case SPELL_BOULDER:
         return make_unique<targeter_boulder>(&you, barrelling_boulder_hp(pow));
     case SPELL_PERMAFROST_ERUPTION:
-        return make_unique<targeter_permafrost>(you, pow);
+        return make_unique<targeter_permafrost>(you);
     case SPELL_PETRIFY:
         return make_unique<targeter_chain>(&you, range, ZAP_PETRIFY);
     case SPELL_RIMEBLIGHT:
@@ -1956,6 +1957,14 @@ vector<string> desc_wl_success_chance(const monster_info& mi, int pow,
     return descs;
 }
 
+static vector<string> _desc_beckoning_valid(const monster_info& mi)
+{
+    if (!can_beckon(mi))
+        return vector<string>{"not susceptible"};
+
+    return vector<string>{};
+}
+
 class spell_targeting_behaviour : public targeting_behaviour
 {
 public:
@@ -2052,6 +2061,8 @@ desc_filter targeter_addl_desc(spell_type spell, int powc, spell_flags flags,
             return _desc_mercury_weak_chance;
         case SPELL_WARP_SPACE:
             return bind(_desc_warp_space_chance, powc);
+        case SPELL_BECKONING:
+            return bind(_desc_beckoning_valid, placeholders::_1);
         default:
             break;
     }
@@ -2072,7 +2083,7 @@ desc_filter targeter_addl_desc(spell_type spell, int powc, spell_flags flags,
 string target_spell_desc(const monster_info& mi, spell_type spell)
 {
     int powc = calc_spell_power(spell);
-    const int range = calc_spell_range(spell, powc, false);
+    const int range = spell_range(spell, &you);
 
     unique_ptr<targeter> hitfunc = find_spell_targeter(spell, powc, range);
     if (!hitfunc)
@@ -3194,7 +3205,7 @@ string spell_damage_string(spell_type spell, bool evoked, int pow, bool terse)
             return make_stringf("%d-%d/arc", FLAT_DISCHARGE_ARC_DAMAGE, max);
         }
         case SPELL_AIRSTRIKE:
-            return describe_airstrike_dam(base_airstrike_damage(pow));
+            return describe_player_airstrike_dam(base_airstrike_damage(pow));
         case SPELL_PILEDRIVER:
             return make_stringf("(3-9)d%d", piledriver_collision_damage(pow, 1, false).size);
         case SPELL_GELLS_GAVOTTE:
@@ -3306,16 +3317,6 @@ string spell_power_string(spell_type spell)
         return make_stringf("%d%%", percent);
 }
 
-int calc_spell_range(spell_type spell, int power, bool allow_bonus,
-                     bool ignore_shadows)
-{
-    if (power == 0)
-        power = calc_spell_power(spell);
-    const int range = spell_range(spell, power, allow_bonus, ignore_shadows);
-
-    return range;
-}
-
 /**
  * Give a string describing a given spell's range, as cast by the player.
  *
@@ -3324,7 +3325,7 @@ int calc_spell_range(spell_type spell, int power, bool allow_bonus,
  */
 string spell_range_string(spell_type spell)
 {
-    const int range    = calc_spell_range(spell, 0);
+    const int range    = spell_range(spell, &you, -1, true);
     const int maxrange = spell_has_variable_range(spell)
                             ? calc_spell_range(spell, spell_power_cap(spell), true, true)
                             : -1;

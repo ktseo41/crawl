@@ -114,6 +114,7 @@ static const vector<god_passive> god_passives[] =
         {  -1, passive_t::reaping },
         {  -1, passive_t::nightvision },
         {  -1, passive_t::r_spectral_mist },
+        {  -1, passive_t::r_misery },
     },
 
     // Xom
@@ -1699,7 +1700,7 @@ static coord_def _find_shadow_prism_position(coord_def& aim)
         {
             coord_def p = you.pos() + targ_spots[i].first;
             if (p != valid_spots[j]
-                && grid_distance(p, valid_spots[j]) <= spell_range(SPELL_SHADOW_PRISM, 100)
+                && grid_distance(p, valid_spots[j]) <= spell_range(SPELL_SHADOW_PRISM)
                 && cell_see_cell(p, valid_spots[j], LOS_NO_TRANS)
                 && cell_see_cell(you.pos(), valid_spots[j], LOS_NO_TRANS)
                 && cell_see_cell(you.pos(), p, LOS_NO_TRANS))
@@ -1853,8 +1854,7 @@ void wu_jian_trigger_serpents_lash(bool wall_jump, const coord_def& old_pos)
         mpr("Your supernatural speed expires.");
     }
 
-    if (!cell_is_solid(old_pos))
-        check_place_cloud(CLOUD_DUST, old_pos, 2 + random2(3) , &you, 1, -1);
+    place_cloud(CLOUD_DUST, old_pos, 2 + random2(3) , &you, 1, -1);
 }
 
 static void _wu_jian_increment_heavenly_storm()
@@ -1965,7 +1965,7 @@ static bool _wu_jian_lunge(coord_def old_pos, coord_def new_pos,
              number_of_attacks > 1 ? ", in a flurry of attacks" : "");
     }
 
-    count_action(CACT_ABIL, ABIL_WU_JIAN_LUNGE);
+    count_action(CACT_ATTACK, ATTACK_LUNGE);
 
     for (int i = 0; i < number_of_attacks; i++)
     {
@@ -2033,7 +2033,7 @@ static bool _wu_jian_whirlwind(coord_def old_pos, coord_def new_pos,
                      ", with incredible momentum" : "");
         }
 
-        count_action(CACT_ABIL, ABIL_WU_JIAN_WHIRLWIND);
+        count_action(CACT_ATTACK, ATTACK_WHIRLWIND);
 
         for (int i = 0; i < number_of_attacks; i++)
         {
@@ -2108,8 +2108,7 @@ bool wu_jian_wall_jump_triggers_attacks(const coord_def &pos)
 bool wu_jian_wall_jump_effects()
 {
     for (adjacent_iterator ai(you.pos(), true); ai; ++ai)
-        if (!cell_is_solid(*ai))
-            check_place_cloud(CLOUD_DUST, *ai, 1 + random2(3) , &you, 0, -1);
+        place_cloud(CLOUD_DUST, *ai, 1 + random2(3) , &you, 0, -1);
 
     vector<monster*> targets = _wu_jian_wall_jump_monsters(you.pos());
     for (auto target : targets)
@@ -2350,8 +2349,6 @@ void makhleb_tyrant_buff()
     }
 }
 
-constexpr int BLOODRITE_MIN_SHOTS = 8;
-
 void makhleb_celebrant_bloodrite()
 {
     if (you.hp * 2 > you.hp_max
@@ -2361,72 +2358,7 @@ void makhleb_celebrant_bloodrite()
         return;
     }
 
-    vector<coord_def> targs;
-    for (monster_near_iterator mi(you.pos(), LOS_NO_TRANS); mi; ++mi)
-    {
-        if (!mi->wont_attack() && !mi->is_firewood())
-            targs.push_back(mi->pos());
-    }
-
-    // Don't activate or go on cooldown if there's nothing to shoot at.
-    if (targs.empty())
-        return;
-
-    mpr("You consecrate your suffering and invoke the rites of blood!");
-
-    // Set cooldown before firing, in case we recieve damage during the volley
-    // (eg: via reflected projectiles) that would trigger this again.
-    you.duration[DUR_CELEBRANT_COOLDOWN] = 1;
-
-    shuffle_array(targs);
-
-    int shots_fired = 0;
-    int repeats = 0;
-
-    bolt beam;
-    beam.range        = you.current_vision;
-    beam.source       = you.pos();
-    beam.source_id    = MID_PLAYER;
-    beam.attitude     = ATT_FRIENDLY;
-    beam.thrower      = KILL_YOU;
-    zappy(ZAP_BLOOD_ARROW, 15 + you.skill(SK_INVOCATIONS, 2), false, beam);
-
-    beam.draw_delay   = 10;
-
-    // Fire once at every visible target. If that doesn't hit the minimum number
-    // of shots, fire at most a second time at each of these targets.
-    while (shots_fired < BLOODRITE_MIN_SHOTS && repeats < 2)
-    {
-        for (size_t i = 0; i < targs.size()
-                && (repeats == 0 || shots_fired < BLOODRITE_MIN_SHOTS); ++i)
-        {
-            bolt shot = beam;
-            shot.target = targs[i];
-            shot.fire();
-            view_clear_overlays();
-            ++shots_fired;
-        }
-        ++repeats;
-        shuffle_array(targs);
-    }
-
-    // If firing twice at every target still didn't hit the minimum number of
-    // shots, fire the rest of them completely at random.
-    while (shots_fired < BLOODRITE_MIN_SHOTS)
-    {
-        coord_def targ = you.pos();
-        targ.x += random_range(-LOS_RADIUS, LOS_RADIUS);
-        targ.y += random_range(-LOS_RADIUS, LOS_RADIUS);
-
-        if (targ == you.pos())
-            continue;
-
-        bolt shot = beam;
-        shot.target = targ;
-        shot.fire();
-        view_clear_overlays();
-        ++shots_fired;
-    }
+    schedule_celebrant_bloodrite_fineff();
 }
 
 void makhleb_execution_activate()

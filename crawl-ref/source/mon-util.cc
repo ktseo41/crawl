@@ -850,15 +850,17 @@ bool mons_offers_beogh_conversion_now(const monster& mon)
 {
     // Do the expensive LOS check last.
     return mons_offers_beogh_conversion(mon)
-                // Only try to convert atheists
+                // Only try to convert atheists...
                 && you.religion == GOD_NO_GOD
+                //...who aren't facing Beogh's wrath
+                && !you.penance[GOD_BEOGH]
                 && !you.has_mutation(MUT_FORLORN)
                 && you.hp * 3 / 2 <= you.hp_max
                 && !mon.is_summoned() && !mon.friendly()
                 && !silenced(mon.pos()) && !mon.has_ench(ENCH_MUTE)
                 && !mons_is_confused(mon) && mons_is_seeking(mon)
                 && mon.foe == MHITYOU && !mons_is_immotile(mon)
-                && you.visible_to(&mon) && you.can_see(mon);
+                && you.can_see(mon);
 }
 
 // Returns true for monsters that obviously (to the player) feel
@@ -1095,11 +1097,6 @@ void discover_mimic(const coord_def& pos)
                                       : item->name(DESC_THE, false, false,
                                                              false, true);
     const bool plural = feature_mimic ? false : item->quantity > 1;
-
-#ifdef USE_TILE
-    tileidx_t tile = tileidx_feature(pos);
-    apply_variations(tile_env.flv(pos), &tile, pos);
-#endif
 
     if (you.see_cell(pos))
         mprf("%s %s a mimic!", name.c_str(), plural ? "are" : "is");
@@ -1421,11 +1418,9 @@ bool mons_is_or_was_unique(const monster& mon)
               && mons_is_unique((monster_type) mon.props[ORIGINAL_TYPE_KEY].get_int());
 }
 
-/// This monster isn't a unique per se, but it gets a name anyway.
-/// E.g., the Hellbinder.
-bool mons_is_specially_named(monster_type mc)
+bool mons_is_the(monster_type mc)
 {
-    return mons_class_flag(mc, M_ALWAYS_NAMED);
+    return mons_class_flag(mc, M_NAME_THE);
 }
 
 /**
@@ -1732,6 +1727,9 @@ bool mons_can_use_stairs(const monster& mon, dungeon_feature_type stair)
         return false;
     }
 
+    if (mon.type == MONS_ORB_GUARDIAN && !player_on_orb_run())
+        return false;
+
     // If this is the entrance to a portal vault (or another region of Pandemonium)
     // only friendly monsters can traverse this.
     if (!mon.friendly()
@@ -1750,14 +1748,14 @@ void name_zombie(monster& mon, monster_type mc, const string &mon_name)
     mon.mname = mon_name;
 
     // For the Lernaean hydra: treat Lernaean as an adjective to
-    // avoid mentions of "the Lernaean hydra the X-headed hydra zombie".
+    // avoid mentions of "Lernaean hydra the X-headed hydra zombie".
     if (mc == MONS_LERNAEAN_HYDRA)
     {
         mon.mname = "Lernaean";
         mon.flags |= MF_NAME_ADJECTIVE;
     }
     // Also for the Enchantress: treat Enchantress as an adjective to
-    // avoid mentions of "the Enchantress the spriggan zombie".
+    // avoid mentions of "Enchantress the spriggan zombie".
     else if (mc == MONS_ENCHANTRESS)
     {
         mon.mname = "Enchantress";
@@ -1769,7 +1767,7 @@ void name_zombie(monster& mon, monster_type mc, const string &mon_name)
     if (starts_with(mon.mname, "shaped "))
         mon.flags |= MF_NAME_SUFFIX;
 
-    // It's unlikely there's a desc for "Duvessa the elf skeleton", but
+    // It's unlikely there's a desc for "Duvessa the elf zombie", but
     // we still want to allow it if overridden.
     if (!mon.props.exists(DBNAME_KEY))
         mon.props[DBNAME_KEY] = mons_class_name(mon.type);
@@ -2322,11 +2320,6 @@ bool mons_has_skeleton(monster_type mc)
     return !mons_class_flag(mc, M_NO_SKELETON);
 }
 
-bool mons_flattens_trees(const monster& mon)
-{
-    return mons_base_type(mon) == MONS_LERNAEAN_HYDRA;
-}
-
 /**
  * Given an average max HP value for a given monster type, what should a given
  * monster have?
@@ -2527,7 +2520,7 @@ int exp_value(const monster& mon, bool real, bool legacy)
         if (mon.has_ench(ENCH_BERSERK))
             maxhp = (maxhp * 2 + 1) / 3;
 
-        if (mon.has_ench(ENCH_DOUBLED_HEALTH))
+        if (mon.has_ench(ENCH_DOUBLED_VIGOUR))
             maxhp = maxhp / 2;
     }
     else
@@ -3124,6 +3117,8 @@ string mons_type_name(monster_type mc, description_level_type desc)
         case DESC_PLAIN: default:             break;
         }
     }
+    else if (mons_is_the(mc))
+        result = "the ";
 
     switch (mc)
     {
@@ -3622,7 +3617,7 @@ static bool _beneficial_beam_flavour(beam_type flavour)
     {
     case BEAM_HASTE:
     case BEAM_HEALING:
-    case BEAM_DOUBLE_HEALTH:
+    case BEAM_DOUBLE_VIGOUR:
     case BEAM_INVISIBILITY:
     case BEAM_MIGHT:
     case BEAM_AGILITY:
@@ -3745,7 +3740,7 @@ bool mons_has_ranged_spell(const monster& mon, bool attack_only,
         if (ms_ranged_spell(slot.spell, attack_only, ench_too)
             // Assume spells with no defined range are always effective at
             // range.
-            && mons_spell_range(mon, slot.spell) != 1)
+            && spell_range(slot.spell, &mon) != 1)
         {
             return true;
         }
@@ -3992,12 +3987,23 @@ bool monster_senior(const monster& m1, const monster& m2, bool fleeing)
            || hd1 > hd2 + min(5, random2(11));
 }
 
-bool mons_class_can_pass(monster_type mc, const dungeon_feature_type grid)
+// XXX: This is very redundant with habitat_is_compatible and is barely used
+// outside of creature merging checks, and should be refactored out.
+bool mons_class_can_pass(monster_type mc, dungeon_feature_type grid)
 {
+    // Malign portal *only* passable by eldritch horrors
     if (grid == DNGN_MALIGN_GATEWAY)
     {
         return mc == MONS_ELDRITCH_TENTACLE
                || mc == MONS_ELDRITCH_TENTACLE_SEGMENT;
+    }
+
+    // Wall monsters can move on most solid features
+    if (mons_class_habitat(mc) & HT_WALLS_ONLY)
+    {
+        // See the comment in habitat_is_compatible().
+        return feat_is_wall(grid) && !feat_is_permarock(grid) ||
+               feat_is_statuelike(grid);
     }
 
     return !feat_is_solid(grid);
@@ -4058,7 +4064,8 @@ static bool _mons_can_pass_door(const monster* mon, const coord_def& pos)
     return mon->can_pass_through_feat(DNGN_FLOOR)
            && (mons_can_open_door(*mon, pos)
                || mons_can_eat_door(*mon, pos)
-               || mons_can_destroy_door(*mon, pos));
+               || mons_can_destroy_door(*mon, pos)
+               || mon->can_pass_through_feat(DNGN_CLOSED_DOOR));
 }
 
 bool mons_can_traverse(const monster& mon, const coord_def& p,

@@ -31,6 +31,7 @@
 #include "delay.h"
 #include "dgn-event.h"
 #include "end.h"
+#include "env.h"
 #include "fight.h"
 #include "files.h"
 #include "fineff.h"
@@ -299,8 +300,8 @@ int check_your_resists(int hurted, beam_type flavour, string source,
         break;
 
     case BEAM_UMBRAL_TORCHLIGHT:
-        if (you.holiness() & ~(MH_NATURAL | MH_DEMONIC | MH_HOLY)
-            || beam->agent(true)->is_player())
+        if (you_worship(GOD_YREDELEMNUL)
+            || you.holiness() & ~(MH_NATURAL | MH_DEMONIC | MH_HOLY))
         {
             hurted = 0;
         }
@@ -377,7 +378,7 @@ void expose_player_to_element(beam_type flavour, int strength, bool slow_cold_bl
          || flavour == BEAM_STICKY_FLAME || flavour == BEAM_STEAM)
         && you.has_bane(BANE_HEATSTROKE))
     {
-        int chance = 25;
+        int chance = 40;
         const int rF = you.res_fire();
         if (rF < 0)
             chance = chance * 3 / 2;
@@ -387,14 +388,14 @@ void expose_player_to_element(beam_type flavour, int strength, bool slow_cold_bl
         if (x_chance_in_y(chance, 100))
         {
             mprf(MSGCH_WARN, "The heat overwhelms you.");
-            you.slow_down(0, random_range(5, 10));
+            you.slow_down(0, random_range(4, 8));
         }
     }
 
     if ((flavour == BEAM_COLD || flavour == BEAM_ICE)
         && you.has_bane(BANE_SNOW_BLINDNESS))
     {
-        int chance = 25;
+        int chance = 40;
         const int rC = you.res_cold();
         if (rC < 0)
             chance = chance * 3 / 2;
@@ -414,7 +415,7 @@ void expose_player_to_element(beam_type flavour, int strength, bool slow_cold_bl
          || flavour == BEAM_STUN_BOLT)
         && you.has_bane(BANE_ELECTROSPASM))
     {
-        int chance = 20;
+        int chance = 30;
         const int rElec = you.res_elec();
         if (rElec < 0)
             chance = chance * 3 / 2;
@@ -423,7 +424,7 @@ void expose_player_to_element(beam_type flavour, int strength, bool slow_cold_bl
 
         if (x_chance_in_y(chance, 100))
         {
-            mprf(MSGCH_WARN, "The electricty makes your body seize.");
+            mprf(MSGCH_WARN, "The electricity makes your body seize.");
             you.increase_duration(DUR_NO_MOMENTUM, random_range(3, 7), 10);
         }
     }
@@ -625,7 +626,7 @@ static void _maybe_ru_retribution(int dam, mid_t death_source)
         if (dam <= 0 || !mons || death_source == MID_YOU_FAULTLESS)
             return;
 
-        ru_retribution_fineff::schedule(mons, &you, dam);
+        schedule_ru_retribution_fineff(mons, &you, dam);
     }
 }
 
@@ -638,7 +639,7 @@ static void _maybe_inflict_anguish(int dam, mid_t death_source)
     {
         return;
     }
-    anguish_fineff::schedule(mons, dam);
+    schedule_anguish_fineff(mons, dam);
 }
 
 static void _maybe_spawn_rats(int dam, kill_method_type death_type)
@@ -756,10 +757,10 @@ void _maybe_blood_hastes_allies()
 static void _maybe_spawn_monsters(int dam, kill_method_type death_type,
                                   mid_t death_source)
 {
-    monster* damager = monster_by_mid(death_source);
+    monster* damager = monster_by_mid(death_source, true);
     // We need to exclude acid damage and similar things or this function
     // will crash later.
-    if (!damager || death_source == MID_YOU_FAULTLESS)
+    if (!damager)
         return;
 
     monster_type mon;
@@ -1027,7 +1028,7 @@ static void _maybe_get_vitrified(mid_t source)
 {
     monster* mon = monster_by_mid(source);
     if (mon && mon->wearing_ego(OBJ_ARMOUR, SPARM_GLASS)
-        && x_chance_in_y(80 + mon->get_hit_dice() * 10, 500))
+        && x_chance_in_y(40 + mon->get_hit_dice() * 5, 500))
     {
         you.vitrify(mon, 4 + random2(5 + mon->get_hit_dice()));
     }

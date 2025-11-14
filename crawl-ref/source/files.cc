@@ -1464,7 +1464,7 @@ static void _place_player(dungeon_feature_type stair_taken,
         || feat_is_trap(env.grid(you.pos())))
     {
         for (distance_iterator di(you.pos(), true, false); di; ++di)
-            if (you.is_habitable_feat(env.grid(*di))
+            if (you.is_habitable(*di)
                 && !is_feat_dangerous(env.grid(*di), true)
                 && !feat_is_trap(env.grid(*di))
                 && !(env.pgrid(*di) & FPROP_NO_TELE_INTO))
@@ -1603,7 +1603,6 @@ static void _generic_level_reset()
     clear_travel_trail();
 }
 
-
 // used to resolve generation order for cases where a single level has multiple
 // portals. This currently should only include portals that can appear at most
 // once.
@@ -1611,6 +1610,7 @@ static const vector<branch_type> portal_generation_order =
 {
     BRANCH_SEWER,
     BRANCH_OSSUARY,
+    // do not pregenerate Necropolis: see bazaars
     BRANCH_ICE_CAVE,
     BRANCH_VOLCANO,
     BRANCH_BAILEY,
@@ -2228,7 +2228,7 @@ bool load_level(dungeon_feature_type stair_taken, load_mode_type load_mode,
     show_update_emphasis();
 
     // Shouldn't happen, but this is too unimportant to assert.
-    deleteAll(env.final_effects);
+    clear_final_effects();
     env.final_effect_monster_cache.clear();
 
     los_changed();
@@ -2425,7 +2425,9 @@ bool load_level(dungeon_feature_type stair_taken, load_mode_type load_mode,
         if (branches[you.where_are_you].branch_flags & brflag::fully_map)
         {
             magic_mapping(GDM, 100, true, false, false, true, false, coord_def(), true);
-            _learn_transporters();
+
+            if (player_in_branch(BRANCH_TEMPLE))
+                _learn_transporters();
             for (rectangle_iterator ri(BOUNDARY_BORDER - 1); ri; ++ri)
             {
                 if (env.map_knowledge(*ri).seen())
@@ -3449,10 +3451,6 @@ void level_excursion::go_to(const level_id& next)
     // TODO: reimplement with no_excursions?
     ASSERT(!crawl_state.generating_level || original.branch == BRANCH_ABYSS);
 
-    // This must be set before loading a level as it redraws the map knowledge
-    // which checks what is currently in view
-    you.on_current_level = (next == original);
-
     if (level_id::current() != next)
     {
         ASSERT(level_excursions_allowed());
@@ -3463,6 +3461,11 @@ void level_excursion::go_to(const level_id& next)
         ever_changed_levels = true;
 
         save_level(level_id::current());
+
+        // This must be set before loading a level as it redraws the map knowledge
+        // which checks what is currently in view.
+        you.on_current_level = (next == original);
+
         _load_level(next);
 
         if (you.level_visited(next))

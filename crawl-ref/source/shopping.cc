@@ -583,7 +583,7 @@ unsigned int item_value(item_def item, bool ident)
         else
         {
             // Variable-strength rings.
-            if (jewellery_type_has_plusses(item.sub_type))
+            if (jewellery_type_has_pluses(item.sub_type))
             {
                 // Formula: price = 5n(n+1)
                 // n is the power. (The base variable is equal to n.)
@@ -706,7 +706,7 @@ unsigned int item_value(item_def item, bool ident)
         {
         case TALISMAN_DEATH:
         case TALISMAN_STORM:
-            valued += 800;
+            valued += 400;
             break;
 
         case TALISMAN_DRAGON:
@@ -714,7 +714,7 @@ unsigned int item_value(item_def item, bool ident)
         case TALISMAN_VAMPIRE:
         case TALISMAN_HIVE:
         case TALISMAN_SPHINX:
-            valued += 600;
+            valued += 300;
             break;
 
         case TALISMAN_MAW:
@@ -722,7 +722,7 @@ unsigned int item_value(item_def item, bool ident)
         case TALISMAN_BLADE:
         case TALISMAN_WEREWOLF:
         case TALISMAN_FORTRESS:
-            valued += 300;
+            valued += 150;
             break;
 
         case TALISMAN_RIMEHORN:
@@ -730,14 +730,14 @@ unsigned int item_value(item_def item, bool ident)
         case TALISMAN_AQUA:
         case TALISMAN_SCARAB:
         case TALISMAN_MEDUSA:
-            valued += 250;
+            valued += 125;
             break;
 
         case TALISMAN_QUILL:
         case TALISMAN_INKWELL:
         case TALISMAN_PROTEAN:
         default:
-            valued += 200;
+            valued += 100;
             break;
         }
         if (is_artefact(item))
@@ -1588,9 +1588,9 @@ void destroy_shop_at(coord_def p)
     }
 }
 
-shop_struct *shop_at(const coord_def& where)
+shop_struct *shop_at(const coord_def& where, bool force_lookup)
 {
-    if (env.grid(where) != DNGN_ENTER_SHOP)
+    if (env.grid(where) != DNGN_ENTER_SHOP && !force_lookup)
         return nullptr;
 
     auto it = env.shop.find(where);

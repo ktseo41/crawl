@@ -102,7 +102,7 @@ static string _describe_favour(god_type which_god)
     const string godname = god_name(which_god);
     switch (god_favour_rank(which_god))
     {
-        case 7:  return "A prized avatar of " + godname;
+        case 7:  return "A prized avatar of " + godname + ".";
         case 6:  return "A favoured servant of " + godname + ".";
         case 5:
 
@@ -145,7 +145,7 @@ static const char *divine_title[][8] =
     {"Tormented",          "Purveyor of Pain",       "Pupil of Sorrows",        "Merchant of Misery",
      "Scholar of Souls",   "Artisan of Death",       "Demagogue of Despair",    "Lord of Darkness"},
 
-    // Yredelemnul -- ferverent death knight theme.
+    // Yredelemnul -- fervent death knight theme.
     {"Traitor",            "Torchbearer",            "Despoiler",               "Black Crusader",
      "Fallen @Genus@",     "Harbinger of Doom",      "Inexorable Tide",         "Bringer of Blasphemy"},
 

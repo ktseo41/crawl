@@ -227,6 +227,7 @@ static bool _grid_is_interesting(const coord_def& pos)
     const auto feat = env.grid(pos);
     if (feat_is_staircase(feat)
        || feat_is_escape_hatch(feat)
+       || feat_is_runed(feat)
        || (is_notable_terrain(feat)
             // Count shops as boring features, because they are
             // handled separately.
@@ -1823,10 +1824,7 @@ bool StashTracker::display_search_results(
             me->add_tile(tile_def(tileidx_feature_base(res.feat)));
         }
         else
-        {
-            const dungeon_feature_type feat = feat_by_desc(res.match);
-            me->add_tile(tile_def(tileidx_feature_base(feat)));
-        }
+            me->add_tile(tile_def(tileidx_feature_base(res.feat)));
 
         stashmenu.add_entry(me);
         hotkey++;

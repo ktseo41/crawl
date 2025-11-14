@@ -1656,6 +1656,15 @@ skill_diff skill_level_to_diffs(skill_type skill, double amount,
         if (ash_has_skill_boost(skill))
             you_skill += ash_skill_point_boost(skill, you.skills[skill] * 10);
 
+        // Factor in wildshape amulet bonus (+5 shapeshifting levels)
+        if (skill == SK_SHAPESHIFTING && you.wearing_jewellery(AMU_WILDSHAPE))
+        {
+            const int wildshape_level = min(you.skills[skill] + 5,
+                                            (int)MAX_SKILL_LEVEL);
+            you_skill += skill_exp_needed(wildshape_level, skill)
+                         - skill_exp_needed(you.skills[skill], skill);
+        }
+
         if (you.skill_manual_points[skill])
             target = you_skill + (target - you_skill) / 2;
     }
@@ -1948,7 +1957,7 @@ string special_conduct_title(skill_type best_skill, uint8_t skill_rank)
     }
 
     // All rune deathless felid
-    if (you.species == SP_FELID && runes_in_pack() >= 15 && you.deaths == 0)
+    if (you.species == SP_FELID && runes_in_pack() >= you.obtainable_runes && you.deaths == 0)
         return "Incurious";
 
     // A harder version of the ruthless efficiency banner
@@ -1963,13 +1972,13 @@ string special_conduct_title(skill_type best_skill, uint8_t skill_rank)
     }
 
     // all runes with a zealot without ever abandoning
-    if (runes_in_pack() >= 15 && you.char_class == JOB_CHAOS_KNIGHT
+    if (runes_in_pack() >= you.obtainable_runes && you.char_class == JOB_CHAOS_KNIGHT
         && you_worship(GOD_XOM) && you.worshipped[GOD_XOM] == 1)
     {
         return "Chaos Fanatic";
     }
 
-    if (runes_in_pack() >= 15 && you.char_class == JOB_CINDER_ACOLYTE
+    if (runes_in_pack() >= you.obtainable_runes && you.char_class == JOB_CINDER_ACOLYTE
         && you_worship(GOD_IGNIS) && you.worshipped[GOD_IGNIS] == 1)
     {
         return "Keeper of the Flame";
@@ -2061,18 +2070,12 @@ string skill_title_by_rank(skill_type best_skill, uint8_t skill_rank,
 
         case SK_SHORT_BLADES:
             if (species::is_elven(species) && skill_rank == 5)
-            {
                 result = "Blademaster";
-                break;
-            }
             break;
 
         case SK_LONG_BLADES:
             if (species == SP_MERFOLK && skill_rank == 5)
-            {
                 result = "Swordfish";
-                break;
-            }
             break;
 
         case SK_ARMOUR:
@@ -2139,6 +2142,8 @@ string skill_title_by_rank(skill_type best_skill, uint8_t skill_rank,
                 result = "Brimstone Smiter";
             else if (species == SP_ONI && skill_rank == 5)
                 result = "Titancaster";
+            else if (species == SP_BARACHI && skill_rank == 5)
+                result = "Frogwright";
             break;
 
         case SK_SUMMONINGS:
@@ -2232,7 +2237,9 @@ string skill_title_by_rank(skill_type best_skill, uint8_t skill_rank,
                 result = "Danse Macabre";
             else if ((species == SP_MERFOLK || species == SP_OCTOPODE)
                 && skill_rank == 5 && god == GOD_LUGONU)
+            {
                 result = "Abyssopelagic";
+            }
             else if (species == SP_OCTOPODE && skill_rank == 5 && is_evil_god(god))
                 result = "Leviathan";
             else if (god != GOD_NO_GOD)
@@ -2259,7 +2266,7 @@ string skill_title_by_rank(skill_type best_skill, uint8_t skill_rank,
         {
             god_type betrayed_god = static_cast<god_type>(
                 you.attribute[ATTR_TRAITOR]);
-            result = god_title(betrayed_god, species, piety);
+            result = god_title(betrayed_god, species, 0);
         }
 
         if (conducts)
@@ -2586,46 +2593,6 @@ int get_crosstrain_points(skill_type sk)
         points += you.skill_points[cross] * 2 / 5;
     return points;
 
-}
-
-/**
- * Is the provided skill one of the elemental spellschools?
- *
- * @param sk    The skill in question.
- * @param ext   If we want to also include alchemy or conjurations.
- *              (The kinda-poison and kinda-pure elements?)
- * @return      Whether it is fire, ice, earth, air, or possibly the above two.
- */
-static bool _skill_is_elemental(skill_type sk, bool ext)
-{
-    if (ext)
-    {
-        return sk == SK_FIRE_MAGIC || sk == SK_EARTH_MAGIC || sk == SK_AIR_MAGIC
-               || sk == SK_ICE_MAGIC || sk == SK_ALCHEMY || sk == SK_CONJURATIONS;
-    }
-    else
-    {
-        return sk == SK_FIRE_MAGIC || sk == SK_EARTH_MAGIC
-               || sk == SK_AIR_MAGIC || sk == SK_ICE_MAGIC;
-    }
-}
-
-/**
- * How skilled is the player at the elemental components of a spell?
- *
- * @param spell     The type of spell in question.
- * @param scale     Scaling factor for skill.
- * @return          The player's skill at the elemental parts of a given spell.
- */
-int destructive_elemental_preference(spell_type spell, int scale)
-{
-    skill_set skill_list;
-    spell_skills(spell, skill_list);
-    int preference = 0;
-    for (skill_type sk : skill_list)
-        if (_skill_is_elemental(sk, true))
-            preference += you.skill(sk, scale);
-    return preference;
 }
 
 void dump_skills(string &text)

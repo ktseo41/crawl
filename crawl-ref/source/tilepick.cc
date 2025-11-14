@@ -466,22 +466,26 @@ tileidx_t tileidx_feature_base(dungeon_feature_type feat)
     case DNGN_EXIT_ZIGGURAT:
     case DNGN_EXIT_BAZAAR:
     case DNGN_EXIT_TROVE:
-    case DNGN_EXIT_OSSUARY:
-    case DNGN_EXIT_BAILEY:
-    case DNGN_EXIT_DESOLATION:
     case DNGN_EXIT_ARENA:
-    case DNGN_EXIT_CRUCIBLE:
         return TILE_DNGN_PORTAL;
     case DNGN_EXIT_NECROPOLIS:
         return TILE_DNGN_EXIT_NECROPOLIS;
     case DNGN_EXIT_SEWER:
         return TILE_DNGN_EXIT_SEWER;
+    case DNGN_EXIT_OSSUARY:
+        return TILE_DNGN_EXIT_OSSUARY;
+    case DNGN_EXIT_BAILEY:
+        return TILE_DNGN_EXIT_BAILEY;
     case DNGN_EXIT_ICE_CAVE:
         return TILE_DNGN_PORTAL_ICE_CAVE;
     case DNGN_EXIT_VOLCANO:
         return TILE_DNGN_EXIT_VOLCANO;
+    case DNGN_EXIT_DESOLATION:
+        return TILE_DNGN_EXIT_DESOLATION;
     case DNGN_EXIT_WIZLAB:
         return TILE_DNGN_PORTAL_WIZARD_LAB;
+    case DNGN_EXIT_CRUCIBLE:
+        return TILE_DNGN_EXIT_CRUCIBLE;
 
 #if TAG_MAJOR_VERSION == 34
     case DNGN_ENTER_PORTAL_VAULT:
@@ -591,15 +595,311 @@ tileidx_t tileidx_feature_base(dungeon_feature_type feat)
     }
 }
 
-#ifdef USE_TILE
 bool is_door_tile(tileidx_t tile)
 {
     return tile >= TILE_DNGN_CLOSED_DOOR &&
         tile < TILE_DNGN_STONE_ARCH;
 }
-#endif
 
-tileidx_t tileidx_feature(const coord_def &gc)
+// Specifically for vault-overwritten doors. We have three "sets" of tiles that
+// can be dealt with. The tile sets should have size 2, 3, 8, or 9. They are:
+//  2. Closed, open.
+//  3. Closed, open, broken.
+//  8. Closed, open, gate left closed, gate middle closed, gate right closed,
+//     gate left open, gate middle open, gate right open.
+//  9. Runed, closed, open, gate left closed, gate middle closed, gate right
+//     closed, gate left open, gate middle open, gate right open.
+static int _get_door_offset(tileidx_t base_tile,
+                            bool opened, bool runed, bool broken,
+                            int gateway_type)
+{
+    int count = tile_dngn_count(base_tile);
+    if (count == 1)
+        return 0;
+
+    // The location of the default "closed" tile.
+    int offset = 0;
+
+    switch (count)
+    {
+    case 2:
+        ASSERT(!runed);
+        return opened ? 1: 0;
+    case 3:
+        if (broken)
+            return 2;
+        if (opened)
+            return 1;
+        return 0;
+    case 8:
+        ASSERT(!runed);
+        // The closed door is at BASE_TILE for sets without runed doors
+        offset = 0;
+        break;
+    case 9:
+        // But is at BASE_TILE+1 for sets with them.
+        offset = 1;
+        break;
+    default:
+        // Passed a non-door tile base, pig out now.
+        die("non-door tile");
+    }
+
+    // If we've reached this point, we're dealing with a gate.
+    if (runed)
+        return 0;
+
+    if (!opened && !runed && gateway_type == 0)
+        return 0;
+
+    return offset + gateway_type;
+}
+
+void apply_variations(const tile_flavour &flv, tileidx_t *bg,
+                      const coord_def &gc)
+{
+    // TODO: there's an awful lot of hardcoding going on here...
+    tileidx_t orig = (*bg) & TILE_FLAG_MASK;
+    tileidx_t flag = (*bg) & (~TILE_FLAG_MASK);
+
+    // TODO: allow the stone type to be set in a cleaner way.
+    if (player_in_branch(BRANCH_GAUNTLET))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_WALL_LAB_STONE;
+        else if (orig == TILE_DNGN_METAL_WALL)
+            orig = TILE_WALL_LAB_METAL;
+        else if (orig == TILE_WALL_PERMAROCK)
+            orig = TILE_WALL_PERMAROCK_BROWN;
+    }
+    else if (player_in_branch(BRANCH_CRYPT))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_WALL_CRYPT;
+        else if (orig == TILE_DNGN_METAL_WALL)
+            orig = TILE_WALL_CRYPT_METAL;
+        else if (orig == TILE_DNGN_OPEN_DOOR)
+            orig = TILE_DNGN_OPEN_DOOR_CRYPT;
+        else if (orig == TILE_DNGN_CLOSED_DOOR)
+            orig = TILE_DNGN_CLOSED_DOOR_CRYPT;
+        else if (orig == TILE_DNGN_BROKEN_DOOR)
+            orig = TILE_DNGN_BROKEN_DOOR_CRYPT;
+    }
+    else if (player_in_branch(BRANCH_TOMB))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_WALL_TOMB;
+    }
+    else if (player_in_branch(BRANCH_DIS))
+    {
+        if (orig == TILE_DNGN_METAL_WALL)
+            orig = TILE_DNGN_METAL_IRON;
+        else if (orig == TILE_DNGN_CRYSTAL)
+            orig = TILE_WALL_EMERALD;
+    }
+    else if (player_in_branch(BRANCH_COCYTUS))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_WALL_ICY_STONE;
+    }
+    else if (player_in_branch(BRANCH_TARTARUS))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_WALL_COBALT_STONE;
+        else if (orig == TILE_DNGN_CRYSTAL)
+            orig = TILE_WALL_EMERALD;
+        else if (orig == TILE_DNGN_METAL_WALL)
+            orig = TILE_DNGN_METAL_WALL_DARKGRAY;
+    }
+    else if (player_in_branch(BRANCH_GEHENNA))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_PYRE;
+        if (orig == TILE_DNGN_METAL_WALL)
+            orig = TILE_DNGN_METAL_WALL_RED;
+    }
+    else if (player_in_branch(BRANCH_BAILEY))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_WALL_STONE_SMOOTH;
+    }
+    else if (player_in_branch(BRANCH_OSSUARY))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_DNGN_STONE_WALL_BROWN;
+    }
+    else if (player_in_branch(BRANCH_SLIME))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_SLIME;
+    }
+    else if (player_in_branch(BRANCH_LAIR))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_LAIR;
+    }
+    else if (player_in_branch(BRANCH_ORC))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_ORC;
+    }
+    else if (player_in_branch(BRANCH_ELF))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+        {
+            if (gc.x % 2 == gc.y % 2)
+                orig = TILE_STONE_WALL_ELF;
+            else
+                orig = TILE_STONE_WALL_ELF_RUNIC;
+        }
+    }
+    else if (player_in_branch(BRANCH_VAULTS))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_VAULT;
+        else if (orig == TILE_DNGN_METAL_WALL)
+            orig = TILE_WALL_VAULTS_METAL;
+        else if (orig == TILE_DNGN_CRYSTAL_WALL)
+            orig = TILE_WALL_VAULTS_CRYSTAL;
+    }
+    else if (player_in_branch(BRANCH_SPIDER))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_SPIDER;
+    }
+    else if (player_in_branch(BRANCH_SNAKE))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_SNAKE;
+    }
+    else if (player_in_branch(BRANCH_SWAMP)
+             || player_in_branch(BRANCH_SEWER))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_WALL_STONE_MOSSY;
+    }
+    else if (player_in_branch(BRANCH_SHOALS))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_SHOALS;
+    }
+    else if (player_in_branch(BRANCH_DEPTHS))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_DEPTHS;
+        else if (orig == TILE_DNGN_METAL_WALL)
+        {
+            if (!((gc.x + gc.y) % 3) == !((gc.x - gc.y) % 3))
+                orig = TILE_WALL_DEPTHS_METAL;
+            else
+                orig = TILE_WALL_DEPTHS_METAL_LEAFY;
+        }
+        else if (orig == TILE_DNGN_CRYSTAL_WALL)
+            orig = TILE_WALL_DEPTHS_CRYSTAL;
+        else if  (orig == TILE_DNGN_GRANITE_STATUE)
+        {
+            int hash = hash3(gc.x * gc.x * 10, gc.y * gc.y * 10,
+                             you.depth * gc.x * gc.y * 27);
+            if (hash % 2 && hash % 7)
+                orig = TILE_DNGN_GRANITE_STATUE_DEPTHS_ZOT;
+            else
+                orig = TILE_DNGN_GRANITE_STATUE_DEPTHS;
+        }
+    }
+    else if (player_in_branch(BRANCH_ABYSS))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+        {
+            tileidx_t choices[3] = {TILE_STONE_WALL_ABYSS_A,
+                                    TILE_STONE_WALL_ABYSS_B,
+                                    TILE_STONE_WALL_ABYSS_C};
+            orig = choices[you.birth_time % 3];
+        }
+    }
+    else if (player_in_branch(BRANCH_PANDEMONIUM))
+    {
+        if (orig == TILE_DNGN_STONE_WALL)
+            orig = TILE_STONE_WALL_PANDEMONIUM;
+    }
+    else if (player_in_branch(BRANCH_ZOT))
+    {
+        if (orig == TILE_DNGN_CRYSTAL_WALL)
+            orig = TILE_CRYSTAL_WALL_ZOT;
+        else if (orig == TILE_DNGN_STONE_WALL)
+        {
+        /* Matches hall_of_zot 2 through 5. */
+            if (you.depth == 2)
+                orig = TILE_DNGN_STONE_WALL_BLUE;
+            else if (you.depth == 3)
+                orig = TILE_DNGN_STONE_WALL_LIGHTBLUE;
+            else if (you.depth == 4)
+                orig = TILE_DNGN_STONE_WALL_MAGENTA;
+            else if (you.depth == 5)
+                orig = TILE_DNGN_STONE_WALL_LIGHTMAGENTA;
+        }
+        else if (orig == TILE_DNGN_METAL_WALL)
+            orig = TILE_DNGN_METAL_ZOT;
+        else if (orig == TILE_DNGN_GRANITE_STATUE)
+        {
+            int hash = hash3(gc.x * gc.x * 10, gc.y * gc.y * 10,
+                             you.depth * gc.x * gc.y * 27);
+            if (hash % 2 && hash % 3 && hash % 7)
+                orig = TILE_DNGN_GRANITE_STATUE_ZOT;
+            else
+                orig = TILE_DNGN_GRANITE_STATUE_DEPTHS_ZOT;
+        }
+    }
+
+    if (orig == TILE_FLOOR_NORMAL)
+        *bg = flv.floor;
+    else if (orig == TILE_WALL_NORMAL)
+        *bg = flv.wall;
+    else if (orig == TILE_DNGN_STONE_WALL
+             || orig == TILE_DNGN_CRYSTAL_WALL
+             || orig == TILE_WALL_PERMAROCK
+             || orig == TILE_WALL_PERMAROCK_CLEAR
+             || orig == TILE_DNGN_METAL_WALL
+             || orig == TILE_DNGN_TREE)
+    {
+        // TODO: recoloring vaults stone walls from corruption?
+        *bg = pick_dngn_tile(tile_dngn_coloured(orig, env.grid_colours(gc)),
+                             flv.special);
+    }
+    else if (is_door_tile(orig))
+    {
+        tileidx_t override = flv.feat;
+        // For vaults overriding door tiles, like Cigotuvi's Fleshworks.
+        if (is_door_tile(override))
+        {
+            bool opened = (orig == TILE_DNGN_OPEN_DOOR);
+            bool runed = (orig == TILE_DNGN_RUNED_DOOR);
+            bool broken = (orig == TILE_DNGN_BROKEN_DOOR);
+            int offset = _get_door_offset(override, opened, runed, broken,
+                                          flv.special);
+            *bg = override + offset;
+        }
+        else
+            *bg = orig + min((int)flv.special, 6);
+    }
+    else if (orig == TILE_DNGN_PORTAL_WIZARD_LAB
+             || orig == TILE_DNGN_EXIT_NECROPOLIS
+             || orig == TILE_DNGN_TRAP_HARLEQUIN)
+    {
+        *bg = orig + flv.special % tile_dngn_count(orig);
+    }
+    else if ((orig == TILE_SHOALS_SHALLOW_WATER
+              || orig == TILE_SHOALS_DEEP_WATER)
+             && element_colour(ETC_WAVES, 0, gc) == LIGHTCYAN)
+    {
+        *bg = orig + 6 + flv.special % 6;
+    }
+    else if (orig < TILE_DNGN_MAX)
+        *bg = pick_dngn_tile(orig, flv.special);
+
+    *bg |= flag;
+}
+
+tileidx_t tileidx_feature_no_flavour(const coord_def &gc)
 {
     dungeon_feature_type feat = env.map_knowledge(gc).feat();
 
@@ -619,16 +919,12 @@ tileidx_t tileidx_feature(const coord_def &gc)
     switch (feat)
     {
     case DNGN_FLOOR:
-        if (env.level_state & LSTATE_SLIMY_WALL)
-            for (adjacent_iterator ai(gc); ai; ++ai)
-                if (env.map_knowledge(*ai).feat() == DNGN_SLIMY_WALL)
-                    return TILE_FLOOR_SLIME_ACIDIC;
+        if (env.map_knowledge(gc).flags & MAP_CORRODING)
+            return TILE_FLOOR_SLIME_ACIDIC;
 
-        if (env.level_state & LSTATE_ICY_WALL
-            && env.map_knowledge(gc).flags & MAP_ICY)
-        {
+        if (env.map_knowledge(gc).flags & MAP_ICY)
             return TILE_FLOOR_ICY;
-        }
+
         // deliberate fall-through
     case DNGN_ROCK_WALL:
     case DNGN_CLEAR_ROCK_WALL:
@@ -650,10 +946,8 @@ tileidx_t tileidx_feature(const coord_def &gc)
                 (feat == DNGN_ROCK_WALL) ? tile_env.flv(gc).wall
                 : tileidx_feature_base(feat);
 
-#ifdef USE_TILE
             if (feat == DNGN_STONE_WALL)
                 apply_variations(tile_env.flv(gc), &idx, gc);
-#endif
 
             tileidx_t base = tile_dngn_basetile(idx);
             tileidx_t spec = idx - base;
@@ -741,6 +1035,13 @@ tileidx_t tileidx_feature(const coord_def &gc)
     default:
         return tileidx_feature_base(feat);
     }
+}
+
+tileidx_t tileidx_feature(const coord_def& gc)
+{
+    tileidx_t tile = tileidx_feature_no_flavour(gc);
+    apply_variations(tile_env.flv(gc), &tile, gc);
+    return tile;
 }
 
 static tileidx_t _mon_random(tileidx_t tile, int mon_id)
@@ -1025,10 +1326,6 @@ void tileidx_out_of_los(tileidx_t *fg, tileidx_t *bg, tileidx_t *cloud, const co
     // Detected info is just stored in map_knowledge and doesn't get
     // written to what the player remembers. We'll feather that in here.
 
-    // save any rays, which will get overwritten by mapped terrain
-    auto rays = *bg & (TILE_FLAG_RAY_MULTI | TILE_FLAG_RAY_OOR | TILE_FLAG_RAY
-                        | TILE_FLAG_LANDING);
-
     const map_cell &cell = env.map_knowledge(gc);
 
     // Override terrain for magic mapping.
@@ -1037,10 +1334,6 @@ void tileidx_out_of_los(tileidx_t *fg, tileidx_t *bg, tileidx_t *cloud, const co
     else
         *bg = mem_bg;
     *bg |= tileidx_unseen_flag(gc);
-
-    // if out-of-los rays are getting shown that shouldn't be, the bug isn't
-    // here -- fix it in the targeter
-    *bg |= rays;
 
     // Override foreground for monsters/items
     if (env.map_knowledge(gc).detected_monster())
@@ -1110,6 +1403,7 @@ static tileidx_t _zombie_tile_to_spectral(const tileidx_t z_tile)
     case TILEP_MONS_ZOMBIE_BUG:
         return TILEP_MONS_SPECTRAL_BUG;
     case TILEP_MONS_ZOMBIE_FISH:
+    case TILEP_MONS_ZOMBIE_SKY_BEAST:
     case TILEP_MONS_ZOMBIE_SKYSHARK:
         return TILEP_MONS_SPECTRAL_FISH;
     case TILEP_MONS_ZOMBIE_CENTAUR:
@@ -1196,6 +1490,7 @@ static tileidx_t _zombie_tile_to_bound_soul(const tileidx_t z_tile)
     case TILEP_MONS_ZOMBIE_BAT:
     case TILEP_MONS_ZOMBIE_BIRD:
     case TILEP_MONS_ZOMBIE_FISH:
+    case TILEP_MONS_ZOMBIE_SKY_BEAST:
     case TILEP_MONS_ZOMBIE_SKYSHARK:
     case TILEP_MONS_ZOMBIE_GUARDIAN_SERPENT:
     case TILEP_MONS_ZOMBIE_SNAKE:
@@ -1287,6 +1582,7 @@ static tileidx_t _zombie_tile_to_simulacrum(const tileidx_t z_tile)
     case TILEP_MONS_ZOMBIE_BUG:
         return TILEP_MONS_SIMULACRUM_BUG;
     case TILEP_MONS_ZOMBIE_FISH:
+    case TILEP_MONS_ZOMBIE_SKY_BEAST:
     case TILEP_MONS_ZOMBIE_SKYSHARK:
         return TILEP_MONS_SIMULACRUM_FISH;
     case TILEP_MONS_ZOMBIE_CENTAUR:
@@ -1382,6 +1678,8 @@ static tileidx_t _zombie_tile_to_skeleton(const tileidx_t z_tile)
         return TILEP_MONS_DRAUGR_QUADRUPED_LARGE;
     case TILEP_MONS_ZOMBIE_FROG:
         return TILEP_MONS_DRAUGR_FROG;
+    case TILEP_MONS_ZOMBIE_SKY_BEAST:
+        return TILEP_MONS_DRAUGR_FISH;
     case TILEP_MONS_ZOMBIE_QUADRUPED_WINGED:
         return TILEP_MONS_DRAUGR_QUADRUPED_WINGED;
     case TILEP_MONS_ZOMBIE_BAT:
@@ -1461,6 +1759,8 @@ static tileidx_t _mon_to_zombie_tile(const monster_info &mon)
 
     // specific per-species zombies - use to override genuses
     static const map<monster_type, tileidx_t> species_tiles = {
+        // XXX: Prince Ribbit is in his human shape after he dies.
+        { MONS_PRINCE_RIBBIT,           TILEP_MONS_ZOMBIE_HUMAN, },
         { MONS_JUGGERNAUT,              TILEP_MONS_ZOMBIE_JUGGERNAUT },
         { MONS_ACID_DRAGON,             TILEP_MONS_ZOMBIE_DRAKE },
         { MONS_STEAM_DRAGON,            TILEP_MONS_ZOMBIE_DRAKE },
@@ -1475,6 +1775,8 @@ static tileidx_t _mon_to_zombie_tile(const monster_info &mon)
         { MONS_LINDWURM,                TILEP_MONS_ZOMBIE_LINDWURM, },
         { MONS_MELIAI,                  TILEP_MONS_ZOMBIE_MELIAI, },
         { MONS_HORNET,                  TILEP_MONS_ZOMBIE_HORNET, },
+        { MONS_SPARK_WASP,              TILEP_MONS_ZOMBIE_HORNET, },
+        { MONS_SKY_BEAST,               TILEP_MONS_ZOMBIE_SKY_BEAST },
         { MONS_SKYSHARK,                TILEP_MONS_ZOMBIE_SKYSHARK, },
         { MONS_DREAM_SHEEP,             TILEP_MONS_ZOMBIE_DREAM_SHEEP, },
     };
@@ -1503,7 +1805,8 @@ static tileidx_t _mon_to_zombie_tile(const monster_info &mon)
         { MONS_CRAB,                    TILEP_MONS_ZOMBIE_CRAB },
         { MONS_SNAPPING_TURTLE,         TILEP_MONS_ZOMBIE_TURTLE },
         { MONS_RIBBON_WORM,             TILEP_MONS_ZOMBIE_WORM },
-        { MONS_GIANT_COCKROACH,         TILEP_MONS_ZOMBIE_ROACH },
+        { MONS_CLOCKROACH,              TILEP_MONS_ZOMBIE_ROACH },
+        { MONS_RADROACH,                TILEP_MONS_ZOMBIE_ROACH },
         { MONS_SCORPION,                TILEP_MONS_ZOMBIE_SCORPION },
         { MONS_EMPEROR_SCORPION,        TILEP_MONS_ZOMBIE_SCORPION },
         { MONS_KRAKEN,                  TILEP_MONS_ZOMBIE_KRAKEN },
@@ -1787,8 +2090,7 @@ static void _add_tentacle_overlay(const coord_def pos,
     if (!in_bounds(next))
         return;
 
-    const coord_def next_showpos(grid2show(next));
-    if (!show_bounds(next_showpos))
+    if (!show_bounds(grid2show(next)))
         return;
 
     tile_flags flag;
@@ -1800,7 +2102,7 @@ static void _add_tentacle_overlay(const coord_def pos,
         case main_dir::west: flag = TILE_FLAG_TENTACLE_SE; break;
         default: die("invalid direction");
     }
-    tile_env.bg(next_showpos) |= flag;
+    tile_env.bk_bg(next) |= flag;
 
     switch (type)
     {
@@ -1812,7 +2114,7 @@ static void _add_tentacle_overlay(const coord_def pos,
         case tentacle_type::spectral_kraken: flag = TILE_FLAG_TENTACLE_SPECTRAL_KRAKEN; break;
         default: flag = TILE_FLAG_TENTACLE_KRAKEN;
     }
-    tile_env.bg(next_showpos) |= flag;
+    tile_env.bk_bg(next) |= flag;
 }
 
 static void _handle_tentacle_overlay(const coord_def pos,
@@ -2220,7 +2522,7 @@ tileidx_t tileidx_monster(const monster_info& mons)
 {
     tileidx_t ch = _tileidx_monster_no_props(mons);
 
-    if ((!mons.ground_level() && !_tentacle_tile_not_flying(ch))
+    if ((mons.airborne() && !_tentacle_tile_not_flying(ch))
         || mons.type == MONS_ORC_APOSTLE || mons.type == MONS_SACRED_LOTUS)
     {
         ch |= TILE_FLAG_FLYING;
@@ -2247,7 +2549,7 @@ tileidx_t tileidx_monster(const monster_info& mons)
         ch |= TILE_FLAG_UNUSUAL;
     else if (mons.type == MONS_PLAYER_GHOST)
     {
-       // Threat is always displayed for ghosts, with different tiles,
+        // Threat is always displayed for ghosts, with different tiles,
         // to make them more easily visible.
         ch |= TILE_FLAG_GHOST;
         switch (mons.threat)
@@ -2434,7 +2736,7 @@ static const map<monster_info_flags, tileidx_t> monster_status_icons = {
     { MB_SHADOWLESS, TILEI_SHADOWLESS },
     { MB_LOWERED_WL, TILEI_WEAK_WILLED },
     { MB_SIGN_OF_RUIN, TILEI_SIGN_OF_RUIN },
-    { MB_DOUBLED_HEALTH, TILEI_DOUBLED_HEALTH },
+    { MB_DOUBLED_VIGOUR, TILEI_DOUBLED_VIGOUR },
     { MB_KINETIC_GRAPNEL, TILEI_KINETIC_GRAPNEL },
     { MB_TEMPERED, TILEI_TEMPERED },
     { MB_HATCHING, TILEI_HEART },
@@ -2741,12 +3043,13 @@ static tileidx_t _tileidx_missile_base(const item_def &item)
     case MI_DART:
         switch (brand)
         {
-        default:             return TILE_MI_DART + 1;
-        case 0:              return TILE_MI_DART;
-        case SPMSL_POISONED: return TILE_MI_DART_POISONED;
-        case SPMSL_CURARE:   return TILE_MI_DART_CURARE;
-        case SPMSL_BLINDING: return TILE_MI_DART_BLINDING;
-        case SPMSL_FRENZY:   return TILE_MI_DART_FRENZY;
+        default:                return TILE_MI_DART + 1;
+        case 0:                 return TILE_MI_DART;
+        case SPMSL_POISONED:    return TILE_MI_DART_POISONED;
+        case SPMSL_CURARE:      return TILE_MI_DART_CURARE;
+        case SPMSL_BLINDING:    return TILE_MI_DART_BLINDING;
+        case SPMSL_FRENZY:      return TILE_MI_DART_FRENZY;
+        case SPMSL_DISJUNCTION: return TILE_MI_DART_DISJUNCTION;
         }
 
     case MI_ARROW:
@@ -3535,7 +3838,7 @@ tileidx_t tileidx_cloud(const cloud_info &cl)
 {
     const cloud_type type  = cl.type;
     const int colour = cl.colour;
-    const unsigned int dur = cl.duration;
+    const unsigned int variety = cl.variety;
 
     tileidx_t ch = cl.tile;
 
@@ -3549,7 +3852,7 @@ tileidx_t tileidx_cloud(const cloud_info &cl)
                 ch = tile_info.base;
                 break;
             case CTVARY_DUR:
-                ch = tile_info.base + min(dur,
+                ch = tile_info.base + min(variety,
                                           tile_main_count(tile_info.base) - 1);
                 break;
             case CTVARY_RANDOM:
@@ -3557,28 +3860,20 @@ tileidx_t tileidx_cloud(const cloud_info &cl)
                         tile_main_count(tile_info.base),
                         cl.pos.y * GXM + cl.pos.x, you.frame_no);
                 break;
+            case CTVARY_MUTAGENIC:
+                ch = (variety == 0 ? TILE_CLOUD_MUTAGENIC_0 :
+                      variety == 1 ? TILE_CLOUD_MUTAGENIC_1
+                                   : TILE_CLOUD_MUTAGENIC_2);
+                ch += ui_random(tile_main_count(ch));
+                break;
+            case CTVARY_VORTEX:
+                ch = variety ? TILE_CLOUD_FREEZING_WINDS_0
+                             : TILE_CLOUD_FREEZING_WINDS_1;
+                break;
         }
 
         if (!ch || ch == TILE_ERROR)
             ch = TILE_CLOUD_GREY_SMOKE;
-
-        switch (type)
-        {
-            case CLOUD_MUTAGENIC:
-                ch = (dur == 0 ? TILE_CLOUD_MUTAGENIC_0 :
-                      dur == 1 ? TILE_CLOUD_MUTAGENIC_1
-                               : TILE_CLOUD_MUTAGENIC_2);
-                ch += ui_random(tile_main_count(ch));
-                break;
-
-            case CLOUD_VORTEX:
-                ch = get_vortex_phase(cl.pos) ? TILE_CLOUD_FREEZING_WINDS_0
-                                               : TILE_CLOUD_FREEZING_WINDS_1;
-                break;
-
-            default:
-                break;
-        }
     }
 
     if (colour != -1)

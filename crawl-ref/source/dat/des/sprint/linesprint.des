@@ -85,7 +85,7 @@ SUBVAULT:  o : pan_hell_end
 MARKER:    & = lua:restrict_door()
 KFEAT:     & = closed_door
 KMONS:     a = Erica / Erolcha / Eustachio / Gastronok / Grum band /\
-               Harold / Joseph / Josephine band / Maurice / Psyche /\
+               Harold / Joseph / Josephine band / Maurice /\
                Sonja / Urug
 NSUBST:    a = 1:a. / 1:a.. / 1:a... / 1:a.... / * = .:70 a:1
 KMONS:     b = Agnes / Aizul / Azrael band / Donald / Frances / Kirke band /\
@@ -986,7 +986,7 @@ NAME:     slime_end
 TAGS:     slime_end
 KMONS:    1 = azure jelly / acid blob w:20 / rockslime / glass eye w:4 /\
               golden eye w:4 / void ooze w:4
-KMONS:    2 = the Royal Jelly
+KMONS:    2 = Royal Jelly
 KITEM:    2 = slimy rune of zot
 COLOUR:   # = lightgreen
 COLOUR:   12 = green

@@ -148,6 +148,10 @@ Harpoon Shot cast
 
 @The_monster@ fires a harpoon shot @at@ @target@.
 %%%%
+Hellfire Court cast
+
+@The_monster@ calls forth @possessive@ servants.
+%%%%
 Hellfire Mortar cast
 
 @The_monster@ blasts a torrent of magma @at@ @target@.
@@ -471,6 +475,10 @@ March of Sorrows Boris cast
 w:5
 @The_monster@ rolls out @possessive@ victims' [laments|suffering].
 %%%%
+Doomsaying Cassandra cast
+
+@The_monster@ says, "I have seen your future, @player_name@! Turn back before you are forced to see it for yourself!"
+%%%%
 Cantrip Dissolution cast
 
 @The_monster@ gurgles to an absent god.
@@ -606,10 +614,6 @@ Rupert cast targeted
 
 @The_monster@ yells loudly @at@ @target@.
 %%%%
-Lehudib's Crystal Spear the Serpent of Hell cast
-
-@The_monster@ spits crystal @at@ @target@.
-%%%%
 Vv cast
 
 VISUAL:@The_monster@ gestures sharply.
@@ -651,6 +655,10 @@ basilisk cast
 
 @floating eye cast@
 %%%%
+bes kemwar cast
+
+@The_monster@ writhes about, and something writhes within @target@.
+%%%%
 Airstrike blizzard demon cast
 
 @The_monster@ lashes out with icy intensity.
@@ -674,6 +682,10 @@ blizzard demon cast
 bombardier beetle cast
 
 @The_monster@ sprays incendiary fluid @at@ @target@.
+%%%%
+March of Sorrows bone dragon cast
+
+@The_monster@ breathes [collective despair|endless sorrows] @at@ @target@.
 %%%%
 brain worm cast
 
@@ -699,6 +711,10 @@ w:5
 cognitogaunt cast
 
 @The_monster@ glimmers violently.
+%%%%
+clockroach cast
+
+@The_monster@ sprays sand from its hourglass @at@ @target@.
 %%%%
 crystal echidna cast targeted
 
@@ -1037,6 +1053,10 @@ You hear a violent whirl.
 thrashing horror cast
 
 @The_monster@ churns violently!
+%%%%
+undertaker cast targeted
+
+@The_monster@ reaches out for @target@.
 %%%%
 Flashing Balestra undying armoury cast
 

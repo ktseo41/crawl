@@ -48,7 +48,7 @@ spret cast_freeze(int pow, monster* mons, bool fail);
 spret cast_airstrike(int pow, coord_def target, bool fail);
 int airstrike_space_around(coord_def target, bool count_invis);
 dice_def base_airstrike_damage(int pow, bool random = false);
-string describe_airstrike_dam(dice_def dice);
+string describe_player_airstrike_dam(dice_def dice);
 string airstrike_intensity_display(int empty_space, tileidx_t& tile);
 string describe_resonance_strike_dam(dice_def dice);
 spret cast_momentum_strike(int pow, coord_def target, bool fail);
@@ -58,6 +58,7 @@ int terrain_shatter_chance(coord_def where, const actor &agent);
 spret cast_irradiate(int powc, actor &caster, bool fail);
 dice_def irradiate_damage(int powc, bool random = true);
 bool ignite_poison_affects_cell(const coord_def where, actor* agent);
+int ignite_poison_net_work(actor* agent);
 spret cast_ignite_poison(actor *agent, int pow, bool fail,
                               bool tracer = false);
 spret cast_unravelling(coord_def target, int pow, bool fail);
@@ -98,7 +99,7 @@ spret cast_thunderbolt(actor *caster, int pow, coord_def aim,
                             bool fail);
 bool mons_should_fire_permafrost(int pow, const actor &agent);
 spret cast_permafrost_eruption(actor &caster, int pow, bool fail);
-set<coord_def> permafrost_targets(const actor &caster, int pow, bool actual = true);
+set<coord_def> permafrost_targets(const actor &caster, bool actual = true);
 
 actor* forest_near_enemy(const actor *mon);
 void forest_message(const coord_def pos, const string &msg,
@@ -148,7 +149,7 @@ void handle_maxwells_coupling();
 void end_maxwells_coupling(bool quiet = false);
 
 spret cast_noxious_bog(int pow, bool fail);
-vector<coord_def> find_bog_locations(const coord_def &center, int pow);
+vector<coord_def> find_bog_locations(const coord_def &center);
 
 vector<coord_def> find_near_hostiles(int range, bool affect_invis,
                                      const actor& agent);

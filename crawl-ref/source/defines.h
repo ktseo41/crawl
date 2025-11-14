@@ -12,7 +12,7 @@
 #include "macros.h"
 
 // In this case, an x86 CPU will use x87 math for floating point calculations,
-// which uses 80 bit intermediate results, andleads to difference from the
+// which uses 80 bit intermediate results, and leads to difference from the
 // (much more common, in 2019) SSE-based calculations.
 // probably far from the only case where seeding isn't reliable...
 #if defined(TARGET_CPU_X86) && !defined(__SSE__)
@@ -186,6 +186,8 @@ const int AGILITY_BONUS = 5;
 #define POLAR_VORTEX_RADIUS 5
 
 #define ZOT_ENTRY_RUNES 3
+
+#define MAX_RUNES 15
 
 // Size of unique_items in player class
 #define MAX_UNRANDARTS 150

@@ -302,7 +302,7 @@ enum spell_type : int
 #if TAG_MAJOR_VERSION == 34
     SPELL_MELEE, // like SPELL_NO_SPELL, but doesn't cause a re-roll
 #endif
-    SPELL_FIRE_SUMMON,
+    SPELL_HELLFIRE_COURT,
 #if TAG_MAJOR_VERSION == 34
     SPELL_SHROUD_OF_GOLUBRIA,
 #endif
@@ -646,5 +646,8 @@ enum spell_type : int
     SPELL_MUTAGENIC_GAZE,
     SPELL_PLANAR_OVERLAY,   // Dummy spell for description purposes
     SPELL_ACID_BALL,
+    SPELL_DOOMSAYING,       // Cassandra's one-shot doom and death effect
+    SPELL_SLEETSTRIKE,
+    SPELL_DIMINISH_SPELLS,
     NUM_SPELLS
 };

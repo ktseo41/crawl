@@ -108,7 +108,7 @@ bool attack::handle_phase_damaged()
         if (blood > defender->stat_hp())
             blood = defender->stat_hp();
         if (blood)
-            blood_fineff::schedule(defender, defender->pos(), blood);
+            schedule_blood_fineff(defender, defender->pos(), blood);
     }
 
     announce_hit();
@@ -450,7 +450,10 @@ void attack::alert_defender()
         && defender->is_monster()
         && attacker->is_monster()
         && attacker->alive() && defender->alive()
-        && (defender->as_monster()->foe == MHITNOT || one_chance_in(3)))
+        && (defender->as_monster()->foe == MHITNOT
+    // Necessary to keep monsters from sometimes being able to injured dazed enemies.
+            || defender->as_monster()->has_ench(ENCH_DAZED)
+            || one_chance_in(3)))
     {
         behaviour_event(defender->as_monster(), ME_WHACK, attacker);
     }
@@ -513,7 +516,7 @@ bool attack::distortion_affects_defender()
         if (defender_visible)
             obvious_effect = true;
         if (!defender->no_tele())
-            blink_fineff::schedule(defender);
+            schedule_blink_fineff(defender);
         break;
     case BANISH:
         if (defender_visible)
@@ -710,7 +713,7 @@ int attack::inflict_damage(int dam, beam_type flavour, bool clean)
     const int final = defender->hurt(responsible, dam, flavour, kill_type,
                                      "", aux_source.c_str(), clean);
 
-    if (!defender->alive())
+    if (defender->is_monster() && !defender->alive())
         defender->props[ATTACK_KILL_KEY] = true;
 
     return final;
@@ -1585,8 +1588,8 @@ actor &attack::stat_source() const
     if (summoner_mid == MID_NOBODY)
         return *attacker;
 
-    actor* summoner = actor_by_mid(attacker->as_monster()->summoner);
-    if (!summoner || !summoner->alive())
+    actor* summoner = actor_by_mid(summoner_mid);
+    if (!summoner || !summoner->alive_or_reviving())
         return *attacker;
     return *summoner;
 }
@@ -1594,7 +1597,7 @@ actor &attack::stat_source() const
 void attack::maybe_trigger_jinxbite()
 {
     if (attacker->is_player() && you.duration[DUR_JINXBITE])
-        jinxbite_fineff::schedule(defender);
+        schedule_jinxbite_fineff(defender);
 }
 
 void attack::maybe_trigger_fugue_wail(const coord_def pos)

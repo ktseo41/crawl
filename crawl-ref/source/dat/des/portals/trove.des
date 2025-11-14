@@ -230,8 +230,9 @@ function species_has_size_limits(e)
          you.race() == "Spriggan"
 end
 
+-- you.race() returns capitalized strings, you.genus() returns all lowercase.
 function no_body_armour_species(e)
-  return you.genus() == "Draconian" or you.race() == "Octopode" or
+  return you.genus() == "draconian" or you.race() == "Octopode" or
          you.race() == "Felid" or you.race() == "Poltergeist"
 end
 
@@ -262,35 +263,50 @@ end
 -- Since there are no full-magic troves any more and troves reward less
 -- items overall, book quality has to be pushed up in compensation.
 function trove_book(_G, school)
-  return  "randbook disc:" .. school .. " splevels:27 numspells:4"
+  return "randbook disc:" .. school .. " splevels:27 numspells:4"
 end
 
--- A repeated function for spellbooks, staves, manuals, and orbs for a school.
+-- A repeated function for spellbooks, staves, manuals, and orbs for a school,
+-- also meant to handle the disjoint item names across schools.
 function trove_standard_magic(e, school, use_staff)
-  local staff = "staff of " .. school
-  local orb = "orb ego:energy randart artprops:" .. school
-  local manual = "manual of " .. school
-  -- If Conjurations or Necromancy troves are added, fix them here.
-  if school == "ice" then
-    staff = "staff of cold"
-  elseif school == "alchemy" then
-    orb = "orb ego:energy randart artprops:Alch"
-  elseif school == "summoning" then
-    orb = "orb ego:energy randart artprops:Summ"
-    manual = "manual of summonings"
+  local inames = {
+    ["conjuration"] = {"conjuration", "Conj", "conjurations"},
+    ["summoning"] = {"ERROR: set use_staff to false", "Summ", "summonings"},
+    ["necromancy"] = {"necromancy", "Necro", "Necromancy"},
+    ["translocations"] = {"ERROR: set use_staff to false", "Tloc", "translocations"},
+    ["hexes"] = {"ERROR: set use_staff to false", "Hexes", "hexes"},
+    ["fire"] = {"fire", "Fire", "fire magic"},
+    ["ice"] = {"cold", "Ice", "ice magic"},
+    ["earth"] = {"earth", "Earth", "earth magic"},
+    ["air"] = {"air", "Air", "air magic"},
+    ["alchemy"] = {"alchemy", "Alch", "alchemy"}
+  }
+  local staff, orb, manual, output = "", "", "", ""
+  local orbs = {"glass w:1", "mesmerism w:1", "attunement w:1"}
+  if you.mutation("hp casting") ~= 1 then
+    table.insert(orbs, "energy w:2")
+    table.insert(orbs, "stardust w:2")
   end
-  if school == "fire" or school == "ice" or school == "air" or school == "earth" then
-    manual = "manual of " .. school .. " magic"
+  for sc, iname in pairs(inames) do
+    if school == sc then
+      staff = "staff of " .. iname[1]
+      orb = "orb randart artprops:" .. iname[2] .. " ego:" ..
+            table.concat(orbs, " / orb randart artprops:" .. iname[2] .. " ego:")
+      manual = "manual of " .. iname[3] .. " w:6"
+    end
   end
-  local m = trove_book(_G, school) .. " w:31 / " .. manual .. " w:5"
+  output = manual
+  if you.mutation("innate caster") ~= 1 then
+    output = output .. " / " .. trove_book(_G, school) .. " w:34 "
+  end
   if you.mutation("no armour") ~= 1 and you.race ~= "Coglin" and
    you.mutation("missing a hand") ~= 1 then
-    m = m .. " / " .. orb .. " w:1"
+    output = output .. " / " .. orb
   end
   if use_staff then
-    m = m .. " / " .. staff .. " w:4 / " .. staff .. " randart"
+    output = output .. " / " .. staff .. " w:4 / " .. staff .. " randart"
   end
-  return m
+  return output
 end
 
 -- Generates the lighter and heavier ends of armour to give properties to.
@@ -324,7 +340,7 @@ end
 -- TODO: also move this to vault.lua. Possibly could be "acquire shield ego:X",
 -- but acquirement only knows it's handling armour and not shields as items.
 function trove_ego_shield(e, ego, artprop)
-  local sh = ""
+  local sh = {}
   local g = "good_item"
   local r = "randart"
   if ego ~= nil then
@@ -333,19 +349,24 @@ function trove_ego_shield(e, ego, artprop)
   if artprop ~= nil then
     r = r .. " artprops:" .. artprop
   end
-  if you.race() ~= "Troll" and you.race() ~= "Oni" and you.base_skill("Shields") < 18 then
-    sh = "buckler ".. g .. " / buckler " .. r
+
+  if you.race() ~= "Troll" and you.race() ~= "Oni" and
+     (you.race() == "Spriggan" or you.base_skill("Shields") < 18) then
+    table.insert(sh, "buckler ".. g)
+    table.insert(sh, "buckler ".. r)
   end
   if you.race() ~= "Spriggan" then
-    sh = sh .. " / kite shield " .. g .. " / kite shield " .. r
-    if you.race() ~= "Kobold" and you.base_skill("Shields") > 0 then
-      sh = sh .. " / tower shield " .. g .. " w:5 / tower shield " .. r .. " w:5"
-    end
+    table.insert(sh, "kite shield ".. g)
+    table.insert(sh, "kite shield ".. r)
+  end
+  if you.race() ~= "Kobold" and you.base_skill("Shields") > 0 then
+    table.insert(sh, "tower shield ".. g .. " w:5")
+    table.insert(sh, "tower shield ".. r .. " w:5")
   end
   if you.race == "Coglin" or you.mutation("missing a hand") == 1 then
     return ""
   else
-    return sh
+    return table.concat(sh, " / ")
   end
 end
 
@@ -480,7 +501,6 @@ end
 function trove_unrand_chances(e, n_glyphs, unrand, criteria, i_glyphs)
   for i in ipairs(unrand) do
     if not criteria[i] and not you.unrands(unrand[i]) and crawl.one_chance_in(100) then
-
       e.kitem(i_glyphs[i] .. " = " .. unrand[i])
       e.nsubst(n_glyphs .. " = 1:" .. i_glyphs[i])
     end
@@ -496,9 +516,10 @@ default-depth: D:12-, Swamp, Snake, Shoals, Spider
 #
 ##############################################################################
 
-NAME:   due_enter_trove_mix
-TAGS:   uniq_trove no_monster_gen no_wall_fixup transparent no_descent
-SUBST:  c : cc., H : G.., G : GGG.
+NAME:    due_enter_trove_mix
+TAGS:    transparent no_descent
+SHUFFLE: c+ / c+ / '"
+SUBST:   '" = ., H : G.., G : GGG.
 : trove.portal(_G)
 COLOUR: c = blue
 MAP
@@ -513,17 +534,15 @@ ENDMAP
 NAME:   enter_trove_5
 TAGS:   transparent no_descent
 : trove.portal(_G)
-COLOUR: e = blue
-FTILE:  e = floor_marble
 : if you.absdepth() <= 15 then
 # Got drafted in from Vaults, while the mages try and close the portal down.
 KMONS:  e = vault guard
 : else
 # And this time he brought some friends...
 KMONS:  el = vault guard
-COLOUR: l = blue
-FTILE:  l = floor_marble
 : end
+COLOUR: e1 = blue
+FTILE:  e1 = floor_marble
 MAP
 ccccc
 c...c
@@ -789,7 +808,7 @@ local small = you.race() == "Spriggan" or you.race() == "Kobold" or
 trove_unrand_chances(_G, "defghi", {"frostbite", "skin of zhor"},
                          {small, no_body_armour_species(_G)}, {"y", "z"})
 }}
-KFEAT:   ? = cache of meat / cache of fruit / cache of baked goods
+KFEAT:   ? = cache_of_meat / cache_of_fruit / cache_of_baked_goods
 KFEAT:   + = closed_clear_door
 KFEAT:   X = x
 : vault_metal_statue_setup(_G, "G", "icy conduit")
@@ -907,7 +926,7 @@ ENDMAP
 NAME:   regret_index_trove_leda
 {{
 trove_setup(_G)
-local pon = "ego:ponderous plus:" crawl.random_range(6, 10)
+local pon = "ego:ponderousness plus:" .. crawl.random_range(6, 10)
 local gen_armour = ""
 if species_has_size_limits(_G) == false then
   gen_armour = "plate armour " .. pon .. " / crystal plate armour " .. pon
@@ -915,16 +934,20 @@ end
 if you.race() == "armataur" or you.race() == "naga" then
   gen_armour = gen_armour .. " / barding good_item / barding randart w:2"
 elseif you.mutation("hooves") ~= 3 and you.mutation("talons") ~= 3 then
-  gen_armour = gen_armour .. " / pair of boots good_item / pair of boots randart w:2"
+  gen_armour = gen_armour .. " / pair of boots good_item w:5 " ..
+                             " / pair of boots ego:earth " ..
+                             " / pair of boots randart w:2"
 end
 trove_offense(_G, trove_weap_brand(_G, "heavy"),
                   trove_standard_magic(_G, "earth", true),
-                  trove_good_talisman(_G, nil, "granite talisman"), "earth magic")
+                  trove_good_talisman(_G, nil, "granite talisman"),
+                  "earth magic")
 trove_defense(_G, "any useful armour randart w:5",
                    gen_armour, trove_jewel_type(_G, "Str:4 w:5") .. " / " ..
                    trove_jewel_type(_G, "*Slow&AC:4"),
                    trove_cons(_G, {"enchant armour"}, nil,
-                              "wand of digging w:20 / any blast wand w:20 charges:8",
+                              "wand of digging w:20 / " ..
+                              "any blast wand w:20 charges:8",
                               nil, "tin of tremorstones"))
 local small = you.race() == "Spriggan" or you.race() == "Kobold" or
               you.race() == "Felid"
@@ -991,7 +1014,7 @@ trove_offense(_G, trove_weap_brand(_G, "spectral"),
                   "alchemy magic")
 trove_defense(_G, "swamp dragon scales good_item / swamp dragon scales randart",
                    trove_ego_gen_armour(_G, "poison_resistance", "rPois"),
-                   trove_jewel_type(_G, "rPois"),
+                   trove_jewel_type(_G, "rPois") .. " / amulet of alchemy randart",
                    trove_cons(_G, scroll, {"lignification q:3 w:5"},
                               "any beam wand charges:8",
                               "wand of roots charges:8 w:5", box))
@@ -1009,7 +1032,7 @@ SUBST:   ' = ' 2:3, " = '22, V = ~', ; = wwW```
 SUBST:   1 = 1 o:1, 2 = 2 p:2
 COLOUR:  n = green
 TILE:    n = dngn_transparent_stone_green
-FTILE:   .-1ot<QR = floor_grass
+FTILE:   .-1ot<QR = floor_grass_dark
 FTILE:   '2p = floor_swamp
 : decorative_floor(_G, 'op', "flower patch")
 KPROP:   Z? = no_tele_into
@@ -1063,8 +1086,10 @@ ENDMAP
 
 # Who said hidden doors were removed, anyway?
 # Rutra's Hidden Sanctum: a stealth and Hexes trove.
+# Lowered weight due to the gimmick and narrow nature of rewards.
 NAME:   pf_index_trove_rutra
 : trove_setup(_G)
+WEIGHT: 5
 KITEM:  ? = gold q:1
 KITEM:  D = stone mimic
 KITEM:  E = wand of flame mimic / potion of moonshine mimic / scroll of noise mimic
@@ -1134,6 +1159,8 @@ xxxxxxxxxxxxxxxxxxxxx
 ENDMAP
 
 # Layout mostly taken from trove_trog_arena, though Trog might approve.
+# Lowered weight due to the lack of spellcaster support and the potentially
+# build-clashing offering of reaping weapons.
 NAME:   regret_index_trove_dread_knight
 TAGS:   no_species_fe
 veto {{ return crawl.game_started() and you.god() == "Elyvilon"
@@ -1164,8 +1191,8 @@ trove_defense(_G, "pearl dragon scales good_item w:5 / \
                    trove_ego_gen_armour(_G, "willpower", "Will"),
                    trove_jewel_type(_G, "Will") .. " / " ..
                    trove_jewel_type(_G, "Slay:4") ..
-                   "amulet of faith artprops:*Silence&Will w:3 / " ..
-                   "amulet of regeneration artprops:*Silence&Will w:3 / ",
+                   "amulet of faith randart artprops:*Silence&Will w:3 / " ..
+                   "amulet of regeneration randart artprops:*Silence&Will w:3 / ",
                    trove_cons(_G, scroll,
                               {"might q:2 w:5", "berserk rage q:3 w:5"},
                               nil, "wand of quicksilver charges:8",
@@ -1248,12 +1275,18 @@ else
   if you.mutation("missing a hand") == 1 then
     if no_body_armour_species(_G) then
       subst("e = ddgh")
-    elseif you.mutation("no jewellery") ~= 1 then
-      subst("e = e:45 f:g")
+    elseif you.mutation("no jewellery") == 1 then
+      subst("f = d")
+      subst("g = e h:15")
+    else
+      subst("e = e:45 fg")
     end
   else
     if no_body_armour_species(_G) then
       subst("e = f")
+    elseif you.mutation("no jewellery") == 1 then
+      subst("f = d")
+      subst("g = e h:15")
     else
       subst("e = e:25 f:20")
     end
@@ -1417,7 +1450,7 @@ end
 if species_is_undead(_G) or you.mutation("no forms") == 1 then
  subst("g = defk")
 end
-if you.god() == "Trog" then
+if you.god() == "Trog" or you.mutation("innate caster") == 1 then
   subst("h = defk")
 end
 if you.mutation("no jewellery") == 1 then
@@ -1431,19 +1464,19 @@ end
 trove_unrand_chances(_G, "defij", {"scales of the dragon king", "mask of the dragon"},
                      {no_body_armour_species(_G), n_hat}, {"Y", "Z"})
 
--- Decorative draagon skeletons under matching element clouds.
+-- Decorative dragon skeletons under matching element clouds.
 local dr = {"steam", "acid", "swamp", "fire", "ice", "storm", "shadow", "pearl"}
 local cl = {"steam", "acidic fog", "poison gas", "flame", "freezing vapour",
             "thunder", "excruciating misery", "blessed fire" }
 local gl = {"H", "I", "J", "K", "L", "M", "N", "O"}
 for i = 1, 8, 1 do
   kitem(gl[i] .. " = " .. dr[i] .. " dragon skeleton")
-  lua_marker( gl[i], fog_machine{ cloud_type = cl[i], pow_min = 5, pow_max = 40,
-    delay = 15, size = 1, walk_dist = 0, spread_rate = 0, excl_rad = 0 } )
+  single_cloud(_G, gl[i], cl[i], false)
 end
 }}
 KPROP:   12' = no_tele_into
 TILE:    G = dngn_statue_dragon
+: tile("c = " .. crackle_def(_G))
 TILE:    v = dngn_metal_zot
 TILE:    o = wall_permarock_clear_blue
 FTILE:   '"12GHIJKLMNOo = floor_rough_blue
@@ -1484,16 +1517,15 @@ NSUBST: ? = 6:d / 6:g / *:'
 {{
 local weap = ""
 local aux1 = ""
-local book = "randbook disc:translocation numspells:4 splevels:27 w:60 / \
-              manual of translocations"
+local magic = trove_standard_magic(_G, "translocations", false)
 local extra = "any manual w:1"
 if no_evil(_G) then
   weap = "acquire weapon / any useful weapon good_item"
 else
   weap = trove_weap_brand(_G, "chaos") .. " / " ..
          trove_weap_brand(_G, "distortion")
-  if no_friendlies(_G) == false then
-    book = book .. " / grand grimoire"
+  if no_friendlies(_G) == false and you.mutation("innate caster") ~= 1 then
+    magic = magic .. " / grand grimoire"
   end
 end
 if you.mutation("weakness stinger") ~= 3 then
@@ -1510,7 +1542,7 @@ end
 if you.mutation("inability to use devices") ~= 1 then
   extra = extra .. " / any misc w:12"
 end
-trove_offense(_G, weap, book,
+trove_offense(_G, weap, magic,
                   trove_good_talisman(_G, nil, nil), "translocations magic")
 trove_defense(_G, "acquire armour / any useful armour randart" .. aux1,
                   "robe randart artprops:Stlth:2 plus:2",
@@ -1545,9 +1577,8 @@ TILE:    t = dngn_demonic_tree_2 / dngn_demonic_tree_3 / \
              dngn_demonic_tree_8 / dngn_demonic_tree_9 / \
              dngn_demonic_tree_15 / dngn_demonic_tree_1
 FTILE:   'defghi!tp = floor_nerves_magenta / floor_nerves_darkgray
-MARKER:  F = lua:fog_machine { cloud_type = "seething chaos", \
-                pow_min = 10, pow_max = 10, delay = 100, \
-                size = 1, walk_dist = 0, start_clouds = 1, excl_rad = 0 }
+: single_cloud(_G, "F", "seething chaos", true)
+KPROP:   wFV = no_tele_into
 epilogue{{
   trove_milestone(_G, "a devouring Rift")
 }}
@@ -1600,7 +1631,7 @@ local extra = ""
 if no_friendlies(_G) == false then
   extra = extra .. " / any ally scroll q:2"
   if you.mutation("no summoning magic") ~= 1 then
-    magic = magic .. " / " .. trove_standard_magic(_G, "summoning", true) ..
+    magic = magic .. " / " .. trove_standard_magic(_G, "summoning", false) ..
             " / any magical staff randart artprops:Summ&Will w:5"
   end
 end
@@ -1610,8 +1641,10 @@ if you.mutation("inability to train armour") ~= 1 and
 end
 if you.race ~= "Coglin" and you.mutation("missing a hand") ~= 1
  and you.mutation("no armour") ~= 1 then
-  extra = extra .. " / orb ego:energy randart artprops:Earth / " ..
-                "orb ego:guile randart artprops:Summ w:5"
+  extra = extra .. " / orb ego:guile randart artprops:Summ w:5"
+  if you.mutation("innate caster") ~= 1 then
+    extra = extra .. " / orb ego:energy randart artprops:Earth"
+  end
 end
 if you.mutation("antennae") ~= 3 and you.mutation("horns") ~= 3 then
   aux = " / helmet randart artprops:Int w:15 / helmet randart artprops:Will w:15"

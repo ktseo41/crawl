@@ -453,7 +453,7 @@ void banished(const string &who, const int power)
     if (you_worship(GOD_XOM) && who != "Xom" && who != "wizard command"
         && who != "a distortion unwield")
     {
-        xom_maybe_reverts_banishment(false, false);
+        xom_maybe_reverts_banishment();
     }
 }
 
@@ -978,12 +978,6 @@ static void _abyss_identify_area_to_shift(coord_def source, int radius,
         _abyss_expand_mask_to_cover_vault(mask, i);
 }
 
-static void _abyss_invert_mask(map_bitmask *mask)
-{
-    for (rectangle_iterator ri(0); ri; ++ri)
-        mask->set(*ri, !mask->get(*ri));
-}
-
 // Moves everything in the given radius around the player (where radius=0 =>
 // only the player) to another part of the level, centred on target_centre.
 // Everything not in the given radius is wiped to DNGN_UNSEEN and the provided
@@ -1046,7 +1040,7 @@ static void _abyss_shift_level_contents_around_player(
     // So far we've used the mask to track the portions of the level we're
     // preserving. The inverse of the mask represents the area to be filled
     // with brand new abyss:
-    _abyss_invert_mask(&abyss_destruction_mask);
+    abyss_destruction_mask.invert();
 
     // Update env.level_vaults to discard any vaults that are no longer in
     // the picture.
@@ -1324,7 +1318,7 @@ static void _update_abyss_terrain(const coord_def &p,
             int cloud_life = _in_wastes(abyssal_state.major_coord) ? 5 : 2;
             cloud_life += random2(2); // force a sequence point, just in case
             if (cloud != CLOUD_NONE)
-                check_place_cloud(_cloud_from_feat(currfeat), rp, cloud_life, 0, 3);
+                place_cloud(_cloud_from_feat(currfeat), rp, cloud_life, 0, 3);
         }
         else if (feat_is_solid(feat))
             delete_cloud(rp);
@@ -1346,6 +1340,9 @@ static void _destroy_all_terrain(bool vaults)
 
 static void _ensure_player_habitable(bool dig_instead)
 {
+    if (crawl_state.game_is_arena())
+        return;
+
     dungeon_feature_type feat = env.grid(you.pos());
     if (!you.can_pass_through_feat(feat) || is_feat_dangerous(feat))
     {
@@ -2029,7 +2026,7 @@ static void _corrupt_square_flavor(const corrupt_env &cenv, const coord_def &c)
         env.grid_colours(c) = floor;
 
     // if you add new features to this, you'll probably need to do some
-    // hand-tweaking in tileview.cc apply_variations.
+    // hand-tweaking in tilepick.cc apply_variations.
     // TODO: these tile assignments here seem to get overridden in
     // apply_variations, or not used at all...what gives?
     if (feat == DNGN_ROCK_WALL)
@@ -2321,10 +2318,8 @@ void lugonu_corrupt_level(int power)
     _corrupt_level_features(cenv);
     run_corruption_effects(300);
 
-#ifndef USE_TILE_LOCAL
     // Allow extra time for the flash to linger.
     scaled_delay(1000);
-#endif
 }
 
 void lugonu_corrupt_level_monster(const monster &who)
@@ -2345,10 +2340,8 @@ void lugonu_corrupt_level_monster(const monster &who)
     for (int i = 0; i < count; ++i)
         _spawn_corrupted_servant_near_monster(who);
 
-#ifndef USE_TILE_LOCAL
     // Allow extra time for the flash to linger.
     scaled_delay(300);
-#endif
 }
 
 /// Splash decorative corruption around the given space.

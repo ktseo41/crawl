@@ -24,6 +24,7 @@
 #include "macro.h"
 #include "message.h"
 #include "mon-act.h"
+#include "mon-abil.h"
 #include "mon-death.h"
 #include "mon-movetarget.h"
 #include "mon-speak.h"
@@ -32,6 +33,7 @@
 #include "religion.h"
 #include "shout.h"
 #include "spl-summoning.h"
+#include "stairs.h"
 #include "state.h"
 #include "stringutil.h"
 #include "terrain.h"
@@ -990,6 +992,13 @@ void behaviour_event(monster* mon, mon_event_type event, const actor *src,
     if (!mon->alive())
         return;
 
+    // Tesseracts react to nothing at all unless activated.
+    if (mon->type == MONS_BOUNDLESS_TESSERACT
+        && !you.props.exists(TESSERACT_SPAWN_COUNTER_KEY))
+    {
+        return;
+    }
+
     ASSERT(!crawl_state.game_is_arena() || src != &you);
     ASSERT_IN_BOUNDS_OR_ORIGIN(src_pos);
     if (mons_is_projectile(mon->type))
@@ -1109,9 +1118,10 @@ void behaviour_event(monster* mon, mon_event_type event, const actor *src,
         if (src == &you && mon->angered_by_attacks())
         {
             if (mon->attitude == ATT_FRIENDLY && mon->is_summoned()
+                && mon->type != MONS_ELDRITCH_TENTACLE
                 && !mon->is_child_monster() && !mons_is_tentacle_segment(mon->type))
             {
-                summon_dismissal_fineff::schedule(mon);
+                schedule_summon_dismissal_fineff(mon);
                 return;
             }
             // Don't attempt to 'anger' monsters that are already hostile; this can
@@ -1456,6 +1466,10 @@ static void _mons_indicate_level_exit(const monster* mon)
             make_stringf(" %s the shaft.",
                 mon->airborne() ? "goes down"
                                 : "jumps into").c_str());
+
+        // Shafts are one-time-use.
+        mpr("The shaft crumbles and collapses.");
+        maybe_destroy_shaft(mon->pos());
     }
 }
 

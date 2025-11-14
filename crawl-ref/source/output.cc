@@ -621,24 +621,14 @@ static bool _boosted_mp()
     return you.duration[DUR_DIVINE_VIGOUR];
 }
 
-static bool _boosted_ac()
+static colour_t _colour_from_stat_mod(int mod)
 {
-    return you.armour_class_scaled(100) > you.base_ac(100);
-}
-
-static bool _boosted_ev()
-{
-    return you.evasion_scaled(100) > you.evasion_scaled(100, true);
-}
-
-static bool _boosted_sh()
-{
-    return qazlal_sh_boost() > 0
-           || (you.get_mutation_level(MUT_EPHEMERAL_SHIELD)
-                && you.duration[DUR_EPHEMERAL_SHIELD])
-           || (you.get_mutation_level(MUT_CONDENSATION_SHIELD)
-                && !you.duration[DUR_ICEMAIL_DEPLETED])
-           || you.duration[DUR_PARRYING];
+    if (mod == 0)
+        return HUD_VALUE_COLOUR;
+    else if (mod < 0)
+        return RED;
+    else
+        return LIGHTBLUE;
 }
 
 #ifdef DGL_SIMPLE_MESSAGING
@@ -1097,12 +1087,7 @@ static void _print_stats_contam(int x, int y)
 static void _print_stats_ac(int x, int y)
 {
     // AC:
-    auto text_col = HUD_VALUE_COLOUR;
-    if (_boosted_ac())
-        text_col = LIGHTBLUE;
-    else if (you.corrosion_amount())
-        text_col = RED;
-
+    auto text_col = _colour_from_stat_mod(you.temp_ac_mod());
     string ac = make_stringf("%2d ", you.armour_class_scaled(1));
 #ifdef WIZARD
     if (you.wizard && !_is_using_small_layout())
@@ -1113,11 +1098,7 @@ static void _print_stats_ac(int x, int y)
     CPRINTF("%-12s", ac.c_str());
 
     // SH: (two lines lower)
-    text_col = HUD_VALUE_COLOUR;
-    if (you.incapacitated() && you.shielded())
-        text_col = RED;
-    else if (_boosted_sh())
-        text_col = LIGHTBLUE;
+    text_col = _colour_from_stat_mod(you.temp_sh_mod());
 
     string sh = make_stringf("%2d ", player_displayed_shield_class());
     textcolour(text_col);
@@ -2018,17 +1999,17 @@ int update_monster_pane()
 }
 #endif
 
-static const char *s_equip_slot_names[] =
-{
-    "Weapon", "Offhand", "Armour", "Helmet", "Gloves", "Boots",
-    "Barding", "Cloak", "Ring", "Amulet", "Gizmo"
-};
-
 int equip_slot_by_name(const char *s)
 {
     for (int i = SLOT_FIRST_STANDARD; i <= SLOT_LAST_STANDARD; ++i)
-        if (!strcasecmp(s_equip_slot_names[i - SLOT_FIRST_STANDARD], s))
+    {
+        const equipment_slot slot = static_cast<equipment_slot>(i);
+        if (!strcasecmp(s, equip_slot_name(slot, true)) ||
+            !strcasecmp(s, equip_slot_name(slot, false)))
+        {
             return i;
+        }
+    }
 
     return -1;
 }
@@ -2384,10 +2365,7 @@ static vector<formatted_string> _get_overview_stats()
     entry.textcolour(HUD_CAPTION_COLOUR);
     entry.cprintf("AC: ");
 
-    if (_boosted_ac())
-        entry.textcolour(LIGHTBLUE);
-    else
-        entry.textcolour(HUD_VALUE_COLOUR);
+    entry.textcolour(_colour_from_stat_mod(you.temp_ac_mod()));
 
     entry.cprintf("%2d", you.armour_class_scaled(1));
 
@@ -2397,10 +2375,7 @@ static vector<formatted_string> _get_overview_stats()
     entry.textcolour(HUD_CAPTION_COLOUR);
     entry.cprintf("EV: ");
 
-    if (_boosted_ev())
-        entry.textcolour(LIGHTBLUE);
-    else
-        entry.textcolour(HUD_VALUE_COLOUR);
+    entry.textcolour(_colour_from_stat_mod(you.temp_ev_mod()));
 
     entry.cprintf("%2d", you.evasion_scaled(1));
 
@@ -2410,10 +2385,7 @@ static vector<formatted_string> _get_overview_stats()
     entry.textcolour(HUD_CAPTION_COLOUR);
     entry.cprintf("SH: ");
 
-    if (_boosted_sh())
-        entry.textcolour(LIGHTBLUE);
-    else
-        entry.textcolour(HUD_VALUE_COLOUR);
+    entry.textcolour(_colour_from_stat_mod(you.temp_sh_mod()));
 
     entry.cprintf("%2d", player_displayed_shield_class());
 
@@ -2730,6 +2702,24 @@ string dump_overview_screen()
     return text;
 }
 
+static string _rampage_passive_string()
+{
+    string desc = "";
+    const int rampage = you.rampaging();
+    if (rampage)
+    {
+        desc += you.has_mutation(MUT_ROLLPAGE) ? "roll" : "rampage";
+
+        const bool infinite = you.unrand_equipped(UNRAND_SEVEN_LEAGUE_BOOTS);
+        const char *inf = Options.char_set == CSET_ASCII ? "+inf"
+                                                         : "+\u221e"; //"∞"
+
+        desc += infinite    ? inf :
+                rampage > 1 ? make_stringf("+%d", rampage) : "";
+    }
+    return desc;
+}
+
 static string _extra_passive_effects()
 {
     vector<string> passives;
@@ -2803,15 +2793,7 @@ static string _extra_passive_effects()
         passives.emplace_back("guardian spirit");
 
     if (you.rampaging())
-    {
-        const bool infinite = you.unrand_equipped(UNRAND_SEVEN_LEAGUE_BOOTS);
-        const char *inf = Options.char_set == CSET_ASCII ? "+inf"
-                                                          : "+\u221e"; //"∞"
-        passives.emplace_back(
-            make_stringf("%s%s",
-                         you.has_mutation(MUT_ROLLPAGE) ? "roll" : "rampage",
-                         infinite ? inf : "").c_str());
-    }
+        passives.emplace_back(_rampage_passive_string().c_str());
 
     if (you.faith())
         passives.emplace_back("faith");
@@ -2823,11 +2805,14 @@ static string _extra_passive_effects()
     if (you.archmagi())
         passives.emplace_back("archmagi");
 
-    const int channel = player_channelling_chance();
-    if (channel)
+    if (you.wearing_ego(OBJ_ARMOUR, SPARM_ENERGY))
     {
-        passives.emplace_back(
-            make_stringf("channel magic (%d%%)", 20 * channel).c_str());
+        const int channel = player_channelling_chance();
+        if (channel)
+        {
+            passives.emplace_back(
+                make_stringf("channel magic (%d%%)", channel).c_str());
+        }
     }
 
     if (you.infusion_amount())

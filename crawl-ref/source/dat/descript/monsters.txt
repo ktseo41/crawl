@@ -69,7 +69,7 @@ known for quarrelling with saints and flooding unfortunate temples. If pressed
 to her limits, she will reveal her true form, the mere sight of which struck
 her husband dead. Adventurers may wish they were so lucky!
 %%%%
-Blorkula the Orcula
+Blorkula the orcula
 
 Once a gangly and bedraggled vampire with a strange obsession with colour,
 Blorkula was offered succour by a missionary of Beogh and became a portly and
@@ -85,6 +85,16 @@ An ancient and powerful lich. Like all true liches, Boris is immortal, and will
 regenerate his desiccated skeletal remains even if completely disintegrated.
 The same cannot be said for his many victims over his many centuries, from
 which he collects and channels their dying woes and regrets.
+%%%%
+Cassandra
+
+As a young woman, Cassandra bound herself in service to Ashenzari and was
+blessed and cursed in equal measure - granted the ability to foresee disasters,
+but only those she was powerless to prevent.
+
+Eventually driven from her homeland as a harbinger of the very plagues she'd
+spent a lifetime warning against, she has come to the dungeon in her final days
+in hope of averting one last catastrophe.
 %%%%
 Cerebov
 
@@ -153,7 +163,7 @@ none of Sigmund's skills in magic, but makes up for it with his skills in
 fighting and a canny head for money. He is eager to prove his superiority by
 killing hapless adventurers with his expensive flail and quick wit.
 %%%%
-the Enchantress
+Enchantress
 
 First and most fearful of her kind, the Enchantress rules over the spriggans of
 the dungeon. She wears an opalescent outfit made of dragon skin that shimmers
@@ -307,7 +317,7 @@ Kirke
 A master of transformation and treachery. Beware, or you may be the next swine
 to join her herd!
 %%%%
-the Lernaean hydra
+Lernaean hydra
 
 A huge beast, mightiest of hydras, infamous in myth and legend. It flows
 through the water faster than a human can run, swatting aside trees as though
@@ -483,10 +493,6 @@ Prince Ribbit
 
 A frog of unusual size, with a tiny crown perched incongruously atop his head.
 %%%%
-Psyche
-
-A fair-haired mage, wandering and seemingly half-mad with grief and guilt.
-%%%%
 Robin
 
 A mountain hobgoblin, recently come in search of the legendary Orb. Not
@@ -604,22 +610,22 @@ tell where one ends and the other begins. She entered the Dungeon to search for
 the secrets of an ancient, long-suppressed cult, said to have exalted metal over
 flesh. The price of knowledge was her humanity - a price she paid eagerly.
 %%%%
-the Serpent of Hell gehenna
+Serpent of Hell gehenna
 
 A huge, red-glowing, three-headed dragon, shrouded in damnation. It is
 possessed by the very essence of Gehenna and its eternal fire.
 %%%%
-the Serpent of Hell cocytus
+Serpent of Hell cocytus
 
 A massive white three-headed dragon, covered with shards of gleaming ice,
 wholly possessed by the nightmarish cold of Cocytus.
 %%%%
-the Serpent of Hell dis
+Serpent of Hell dis
 
 A towering three-headed beast with an army's worth of swords for teeth. Each of
 its scales is a shield with a razored edge.
 %%%%
-the Serpent of Hell tartarus
+Serpent of Hell tartarus
 
 Seemingly three pairs of lurid magenta eyes hanging in the darkness, the
 outline of a vast, sinuous dragon is just barely perceptible behind. Its malice
@@ -790,6 +796,12 @@ A sacred, self-created sunbird, representative of rebirth. It has ascended
 past the cycles of life and death, and calls upon aspects of both, rising forth
 from death in a burst of unholy flame.
 %%%%
+bes kemwar
+
+A minor hairy maggot spirit, phasing in and out of this plane. Each regional
+variant inflicts different minor ailments: the ones found in the Dungeon
+cause one's magic to grow weak.
+%%%%
 black bear
 
 A small black bear. Like all ursines, it will become enraged if badly hurt.
@@ -858,8 +870,9 @@ partially affected by fire resistance.
 bone dragon
 
 A mighty undead abomination, pieced together from the broken bones of many
-dragons by powerful necromantic magic. Fortunately, whatever organ produces a
-dragon's fearsome breath was lost in the process.
+dragons by powerful necromantic magic. The collective despair of such
+desecrated dragons gives this horror its own undying breath weapon, in
+billowing clouds of excruciating misery.
 %%%%
 boulder
 
@@ -930,7 +943,7 @@ ground, the dungeon bullfrog is as large as it sounds.
 bunyip
 
 A flesh-eating beast that uses its limbs and tail interchangeably. It moves
-with alarming speed, but must pause to reorganize itself after each attack.
+with alarming speed, but must pause to reorganise itself after each attack.
 Its distinctive screams carry far and wide.
 %%%%
 butterfly
@@ -998,6 +1011,14 @@ instead in the whims of cruel chaos. This ominous owl-winged head is all that
 remains of a former archmage: it delights in spreading misfortune and drinking
 blood in its new airborne form.
 %%%%
+clockroach
+
+A common dungeon pest that combines the worst features of a scavenging insect
+and a looming deadline.
+
+Time flows strangely around it, rewinding any injuries inflicted upon it unless
+the source of them is near enough to be caught up in its timestream.
+%%%%
 cognitogaunt
 
 A wizened, headless corpse, animated not by conventional necromancy but by the
@@ -1041,7 +1062,7 @@ crystal guardian
 
 An intricate animated statue made of heavily ensorcelled crystal that is
 immune to most forms of magic. The spells which created it are so powerful
-that even flesh may start to crystalize around any fragments that become
+that even flesh may start to crystallise around any fragments that become
 embedded in it - leaving its foes brittle and vulnerable.
 %%%%
 culicivora
@@ -1324,8 +1345,9 @@ A member of a short, sturdy mountain-dwelling folk.
 %%%%
 earth elemental
 
-A spirit drawn from the elemental plane of earth, which exists in this world by
-inhabiting a lump of earth and rocks.
+A spirit drawn from the elemental plane of earth. It exists in this world as a
+sinuous stream of silt and stone, capable of smoothly flowing through solid
+rock.
 %%%%
 efreet
 
@@ -1525,11 +1547,6 @@ ghoul
 A decayed cadaver, reanimated and accursed with a terrible hunger. It desires
 nothing but to feed on the flesh of the living, and will fell its victims with
 its vicious claws.
-%%%%
-giant cockroach
-
-A big brown insect that makes a nasty hissing noise. Contrary to popular myth,
-it is in fact quite susceptible to mutagenic energies.
 %%%%
 glass eye
 
@@ -1758,7 +1775,7 @@ to grow many more!
 Hitting it with any bladed weapon bigger than a short blade risks lopping a
 head off and causing two more to grow in its place. Very large claws, such as
 trolls', are long enough to do the same. Only a weapon branded with flame will
-cauterize the wound and prevent more heads from growing.
+cauterise the wound and prevent more heads from growing.
 %%%%
 ice beast
 
@@ -1941,6 +1958,11 @@ A skull-masked kobold, its body mutated by forbidden magics. It conducts vile
 experiments in the service of demonic powers, formulating ever more terrible
 monstrosities as vessels for devilish minds.
 %%%%
+kobold geomancer
+
+A wily kobold who has learned to weaponise every crack and crevice that lines
+the walls of its domain.
+%%%%
 komodo dragon
 
 An enormous monitor lizard more than capable of preying on large animals.
@@ -2052,7 +2074,7 @@ glistens as if seen through ocean spray.
 %%%%
 merfolk avatar
 
-A beguiling merfolk whose voice mesmerizes listeners. It carries no weapon,
+A beguiling merfolk whose voice mesmerises listeners. It carries no weapon,
 but its song summons drowned souls to defend the sea against intruders.
 %%%%
 merfolk impaler
@@ -2066,7 +2088,7 @@ javelins.
 %%%%
 merfolk siren
 
-A beguiling merfolk whose voice can mesmerize listeners.
+A beguiling merfolk whose voice can mesmerise listeners.
 %%%%
 minotaur
 
@@ -2090,6 +2112,14 @@ moth of wrath
 A moth known for its ability to inspire rage by touching its foes, or merely
 gazing at its friends. For some inexplicable reason, it was eradicated from
 the surface centuries ago.
+%%%%
+mountainshell
+
+An enormous land tortoise whose shell is so thick and rock-encrusted that
+sleeping ones are frequently mistaken for geological formations. And like a
+mountain, its exterior is nearly impervious to any destructive force; only at
+close range can one properly aim for the narrow gaps between its plates to
+strike the tender flesh within.
 %%%%
 mummy
 
@@ -2244,7 +2274,12 @@ An amber-coloured demon with a barbed tail not unlike that of a scorpion.
 Orb Guardian
 
 A huge, glowing, four-limbed purple creature with heightened senses, created by
-the Orb itself. It guards the Orb with enormous punctiliousness and violence.
+the Orb itself. It guards the Orb with enormous punctiliousness and violence,
+and its death will alert any Boundless Tesseracts on the level to begin creating
+reinforcements.
+
+Unless the Orb has already been disturbed, it will refuse to abandon its duty
+by leaving the floor.
 %%%%
 orb of destruction
 
@@ -2363,7 +2398,7 @@ a shield. It projects a kinetic barrier around its creator while adjacent to
 them, increasing their armour class.
 
 It will never voluntarily leave its creator's side, and if forcibly seperated,
-will prioritize returning to them over any other concerns.
+will prioritise returning to them over any other concerns.
 %%%%
 phantasmal warrior
 
@@ -2581,13 +2616,18 @@ river rat
 A rodent with hair of a most peculiar green colour, and a powerful bite. It
 tends to form great swarms with its kin.
 %%%%
+rock fish
+
+A strange stone-scaled fish that swims through solid rock with the same ease
+that most fish do through water.
+%%%%
 rockslime
 
 An oozing avalanche, scouring the ground beneath it as it rumbles forward.
 It consumes only the metal and bone from its victims, using them to reinforce
 itself even further.
 %%%%
-the Royal Jelly
+Royal Jelly
 
 A particularly rich and golden gelatinous thing. Smaller jellies swim and pulse
 just below its surface, ready to burst forth at the slightest touch.
@@ -3162,6 +3202,14 @@ ugly thing
 An ugly thing. According to legend, it is the otherworldly spawn of a wizard's
 breeding experiment. Yuck.
 %%%%
+undertaker
+
+The Dungeon's vast repositories of the dead and the unholy realms thereafter
+both require regular restocking and reorganisation, far beyond the coordination
+of the restless dead. These corpse-collecting constructs burrow through the
+earth and command divisions of zombified hands to assist them in stealing away
+carrion, and may also violently create new corpses for such purposes.
+%%%%
 unseen horror
 
 A creature rarely seen by anyone; those few who have seen one would rather they
@@ -3294,7 +3342,7 @@ A particularly evil-looking wolf, usually found in the company of orcs.
 war gargoyle
 
 A rare type of gargoyle, constructed from a solid steel statue and imbued with
-vicious strength, speed, and weaponized breath.
+vicious strength, speed, and weaponised breath.
 %%%%
 water elemental
 
@@ -3704,7 +3752,7 @@ A bat that is well past its sell-by date.
 %%%%
 sickly merfolk siren
 
-A young merfolk that looks quite sick, but still has the power to mesmerize its
+A young merfolk that looks quite sick, but still has the power to mesmerise its
 victims.
 %%%%
 skeletal bat

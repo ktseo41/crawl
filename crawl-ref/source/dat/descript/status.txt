@@ -74,9 +74,10 @@ effects.
 Berserk status
 
 You are hasted, deal increased damage in combat, and have increased health, but
-are unable to make most actions other than moving and attacking. The status
-will wear off very quickly unless you are attacking monsters, and when it
-expires you will be slowed and unable to berserk again for a short duration.
+are unable to perform most actions other than moving and attacking in melee.
+The status will wear off very quickly unless you are attacking monsters, and
+when it expires you will be slowed and unable to berserk again for a short
+duration.
 %%%%
 -Berserk status
 
@@ -318,8 +319,7 @@ QUAD DAMAGE!
 Sil status
 
 You are silenced. This makes reading scrolls, casting spells, invoking divine
-abilities, or shouting impossible. The oppressive, unnatural effect greatly
-hampers your stealth.
+abilities, or shouting impossible.
 %%%%
 Engulf status
 
@@ -729,7 +729,7 @@ You are bribing the inhabitants of the current branch.
 %%%%
 Cloud status
 
-You are standing in a cloud.
+You are in a cloud.
 %%%%
 -Clouds status
 
@@ -789,6 +789,11 @@ Gem status
 
 If you spend the indicated number of turns in this branch, its gem will be found
 and shattered by the power of Zot.
+%%%%
+Gem (*) status
+
+The power of Zot no longer hunts you, but this branch's gem still remains
+intact.
 %%%%
 rF0 status
 
@@ -1211,7 +1216,7 @@ Doom status
 
 A malevolent fate is gathering around you. If your Doom reaches 100%, you will
 be afflicted by a random bane and your Doom will reset to 0. Banes have diverse
-negative effects that can significant endanger your character for an extended
+negative effects that can significantly endanger your character for an extended
 period of time.
 
 Both Doom and Banes are only cured by gaining experience, though Banes typically
@@ -1227,7 +1232,8 @@ Tesseract status
 
 A Boundless Tesseract is drawing in forces from a parallel reality. New monsters
 will steadily appear at random locations across the floor until either of the
-tesseracts is destroyed. This rate is slow at first, but accelerates with time.
+tesseracts is destroyed. If this is allowed to continue for a very long time,
+those monsters may sometimes appear near your location instead.
 %%%%
 -Star status
 
@@ -1238,3 +1244,8 @@ several turns pass while your MP is full and there are no enemies in sight.
 
 Your orb of mesmerism has recently expended its energy. It will recharge after
 a short length of time (but cannot recharge on turns where you move).
+%%%%
+Phobia status
+
+Your claustrophobia has given you a slaying malus. This is dependent on the
+number of walls surrounding you.

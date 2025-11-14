@@ -129,9 +129,9 @@ static const armour_def Armour_prop[] =
     { ARM_LEATHER_ARMOUR,       "leather armour",         3,  -40,   20,
         SLOT_BODY_ARMOUR, SIZE_SMALL, SIZE_MEDIUM, true, 10, BASIC_BODY_EGOS },
     { ARM_RING_MAIL,            "ring mail",              5,  -70,   40,
-        SLOT_BODY_ARMOUR, SIZE_SMALL,  SIZE_MEDIUM, true, 100, BASIC_BODY_EGOS },
+        SLOT_BODY_ARMOUR, SIZE_SMALL,  SIZE_MEDIUM, true, 80, BASIC_BODY_EGOS },
     { ARM_SCALE_MAIL,           "scale mail",             6, -100,   40,
-        SLOT_BODY_ARMOUR, SIZE_SMALL,  SIZE_MEDIUM, true, 10, {
+        SLOT_BODY_ARMOUR, SIZE_SMALL,  SIZE_MEDIUM, true, 60, {
             { SPARM_FIRE_RESISTANCE,   20 },
             { SPARM_COLD_RESISTANCE,   20 },
             { SPARM_POISON_RESISTANCE, 10 },
@@ -143,11 +143,11 @@ static const armour_def Armour_prop[] =
             { SPARM_RESONANCE,          7 },
     }},
     { ARM_CHAIN_MAIL,           "chain mail",             8, -140,   60,
-        SLOT_BODY_ARMOUR, SIZE_SMALL,  SIZE_MEDIUM, true, 10, HEAVY_BODY_EGOS },
+        SLOT_BODY_ARMOUR, SIZE_SMALL,  SIZE_MEDIUM, true, 60, HEAVY_BODY_EGOS },
     { ARM_PLATE_ARMOUR,         "plate armour",          10, -180,   180,
-        SLOT_BODY_ARMOUR, SIZE_SMALL, SIZE_MEDIUM, true, 150, HEAVY_BODY_EGOS },
+        SLOT_BODY_ARMOUR, SIZE_SMALL, SIZE_MEDIUM, true, 100, HEAVY_BODY_EGOS },
     { ARM_CRYSTAL_PLATE_ARMOUR, "crystal plate armour",  14, -230,   600,
-        SLOT_BODY_ARMOUR, SIZE_SMALL, SIZE_MEDIUM, false, 150 },
+        SLOT_BODY_ARMOUR, SIZE_SMALL, SIZE_MEDIUM, false, 100 },
 
 #if TAG_MAJOR_VERSION == 34
     { ARM_TROLL_HIDE, "removed troll hide",              0,    0,      0,
@@ -239,7 +239,6 @@ static const armour_def Armour_prop[] =
     { ARM_ORB,                 "orb",                     0,   0,   50,
         SLOT_OFFHAND,      SIZE_LITTLE, SIZE_GIANT, true, 0, {
             { SPARM_GLASS,      1 },
-            { SPARM_RAGE,       1 },
             { SPARM_MAYHEM,     1 },
             { SPARM_GUILE,      1 },
             { SPARM_ENERGY,     1 },
@@ -300,7 +299,7 @@ static const armour_def Armour_prop[] =
     DRAGON_ARMOUR(STORM,       "storm",                  10, -150,  650,
         ARMF_RES_ELEC),
     DRAGON_ARMOUR(SHADOW,      "shadow",                 11, -150,  650,
-        ard(ARMF_STEALTH, 4)),
+        ARMF_STEALTH),
     DRAGON_ARMOUR(GOLDEN,      "golden",                 12, -230,  800,
         ARMF_RES_FIRE | ARMF_RES_COLD | ARMF_RES_POISON),
 
@@ -502,7 +501,7 @@ static const weapon_def Weapon_prop[] =
         SK_MACES_FLAILS, SIZE_LITTLE, SIZE_LITTLE, MI_NONE,
         DAMV_CRUSHING, 10, 0, 5, CLUB_BRANDS },
 #if TAG_MAJOR_VERSION == 34
-    { WPN_SPIKED_FLAIL,      "spiked flail",        5,  3, 13,
+    { WPN_SPIKED_FLAIL,      "old spiked flail",    5,  3, 13,
         SK_MACES_FLAILS, SIZE_LITTLE, SIZE_LITTLE, MI_NONE,
         DAMV_CRUSHING, 0, 0, 0, {} },
 #endif
@@ -522,7 +521,7 @@ static const weapon_def Weapon_prop[] =
             { SPWPN_ANTIMAGIC,      1 },
         }},
 #if TAG_MAJOR_VERSION == 34
-    { WPN_HAMMER,            "hammer",              7,  3, 13,
+    { WPN_HAMMER,            "old hammer",          7,  3, 13,
         SK_MACES_FLAILS, SIZE_LITTLE, SIZE_LITTLE, MI_NONE,
         DAMV_CRUSHING, 0, 0, 0, M_AND_F_BRANDS },
 #endif
@@ -623,11 +622,10 @@ static const weapon_def Weapon_prop[] =
         SK_SHORT_BLADES, SIZE_LITTLE, SIZE_LITTLE, MI_NONE,
         DAMV_PIERCING, 8, 25, 55, SBL_BRANDS },
 #if TAG_MAJOR_VERSION == 34
-    { WPN_CUTLASS,          "cutlass",              8,  4, 12,
+    { WPN_CUTLASS,          "old cutlass",          8,  4, 12,
         SK_SHORT_BLADES, SIZE_LITTLE, SIZE_LITTLE, MI_NONE,
         DAMV_SLICING | DAM_PIERCE, 0, 0, 0, {}},
 #endif
-
 
     // Long Blades
     { WPN_FALCHION,              "falchion",               8,  2, 13,
@@ -713,7 +711,7 @@ static const weapon_def Weapon_prop[] =
         SK_POLEARMS,     SIZE_MEDIUM, NUM_SIZE_LEVELS,  MI_NONE,
         DAMV_CHOPPING | DAM_PIERCE, 5, 15, 40, POLEARM_BRANDS },
 #if TAG_MAJOR_VERSION == 34
-    { WPN_SCYTHE,            "scythe",             14, -4, 20,
+    { WPN_SCYTHE,            "old scythe",         14, -4, 20,
         SK_POLEARMS,     SIZE_MEDIUM, NUM_SIZE_LEVELS, MI_NONE,
         DAMV_SLICING, 0, 0, 0, POLEARM_BRANDS },
 #endif
@@ -767,7 +765,7 @@ static const weapon_def Weapon_prop[] =
 
     // Range weapons
 #if TAG_MAJOR_VERSION == 34
-    { WPN_BLOWGUN,           "blowgun",             0,  2, 10,
+    { WPN_BLOWGUN,           "old blowgun",         0,  2, 10,
         SK_THROWING,     SIZE_LITTLE, SIZE_LITTLE, MI_NEEDLE,
         DAMV_NON_MELEE, 0, 0, 0, {}, },
 #endif
@@ -789,7 +787,7 @@ static const weapon_def Weapon_prop[] =
             { SPWPN_ANTIMAGIC,     2 },
         } },
 #if TAG_MAJOR_VERSION == 34
-    { WPN_FUSTIBALUS,        "fustibalus",         10, -2, 16,
+    { WPN_FUSTIBALUS,        "old fustibalus",     10, -2, 16,
         SK_RANGED_WEAPONS,   SIZE_LITTLE, SIZE_SMALL, MI_SLING_BULLET,
         DAMV_NON_MELEE, 0, 0, 150, RANGED_BRANDS },
 #endif
@@ -2016,6 +2014,25 @@ static bool _staff_uses_evocations(const item_def &item)
     return item.base_type == OBJ_STAVES;
 }
 
+static bool _orb_uses_evocations(const item_def &item)
+{
+    if (!item.is_type(OBJ_ARMOUR, ARM_ORB))
+        return false;
+
+    if (is_unrandom_artefact(item, UNRAND_WUCAD_MU)
+        || item.brand == SPARM_ENERGY
+        || item.brand == SPARM_GLASS
+        || item.brand == SPARM_GUILE
+        || item.brand == SPARM_MESMERISM
+        || item.brand == SPARM_PYROMANIA
+        || item.brand == SPARM_STARDUST)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 const char* staff_type_name(stave_type s)
 {
     if (s == NUM_STAVES)
@@ -2098,6 +2115,7 @@ bool item_skills(const item_def &item, set<skill_type> &skills)
                                  && item.base_type != OBJ_TALISMANS
                                  && item.base_type != OBJ_BAUBLES
         || gives_ability(item)
+        || _orb_uses_evocations(item)
         || _staff_uses_evocations(item))
     {
         skills.insert(SK_EVOCATIONS);
@@ -2237,14 +2255,22 @@ bool ammo_never_destroyed(const item_def &missile)
 }
 
 /**
- * Returns the one_chance_in for a missile type for be destroyed on impact.
+ * Returns the one_chance_in for a missile for be destroyed on impact.
  *
- * @param missile_type      The missile type to get the mulch chance for.
+ * @param missile           The missile in question.
  * @return                  The inverse of the missile type's mulch chance.
  */
-int ammo_type_destroy_chance(int missile_type)
+int ammo_destroy_chance(const item_def &missile)
 {
-    return Missile_prop[ Missile_index[missile_type] ].mulch_rate;
+    int chance = Missile_prop[ Missile_index[missile.sub_type] ].mulch_rate;
+    const int brand = get_ammo_brand(missile);
+
+    if (brand == SPMSL_CURARE || brand == SPMSL_DISJUNCTION)
+        chance /= 2;
+
+    dprf("mulch chance: one in %d", chance);
+
+    return chance;
 }
 
 /**
@@ -2364,10 +2390,10 @@ bool jewellery_has_pluses(const item_def &item)
     if (!item.is_identified())
         return false;
 
-    return jewellery_type_has_plusses(item.sub_type);
+    return jewellery_type_has_pluses(item.sub_type);
 }
 
-bool jewellery_type_has_plusses(int jewel_type)
+bool jewellery_type_has_pluses(int jewel_type)
 {
     switch (jewel_type)
     {
@@ -3705,24 +3731,7 @@ bool is_usable_talisman(const item_def& item)
     if (item.sub_type == TALISMAN_PROTEAN)
         return false;
 
-    return cannot_evoke_item_reason(&item, false, false).empty();
-}
-
-bool ring_plusses_matter(int ring_subtype)
-{
-    switch (ring_subtype)
-    {
-        case RING_PROTECTION:
-        case RING_STRENGTH:
-        case RING_SLAYING:
-        case RING_EVASION:
-        case RING_DEXTERITY:
-        case RING_INTELLIGENCE:
-            return true;
-
-        default:
-            return false;
-    }
+    return cannot_put_on_talisman_reason(item, false).empty();
 }
 
 bool item_gives_equip_slots(const item_def& item)

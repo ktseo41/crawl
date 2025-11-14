@@ -28,7 +28,7 @@ void adjust()
 
     const int keyin = toalower(get_ch());
 
-    if (keyin == 'g')
+    if (keyin == 'g' || keyin == 'i')
         adjust_item(OSEL_GEAR);
     else if (keyin == 'p')
         adjust_item(OBJ_POTIONS);
@@ -175,7 +175,7 @@ static void _adjust_spell()
 
 static void _adjust_ability()
 {
-    const vector<talent> talents = your_talents(false);
+    const vector<talent> talents = your_talents();
 
     if (talents.empty())
     {
@@ -324,9 +324,14 @@ void swap_inv_slots(item_def& to_adjust, int to_slot, bool verbose)
         if (to_count > 0)
             last_pickup[from_slot] = to_count;
     }
+
     if (you.last_unequip == from_slot)
         you.last_unequip = to_slot;
+    else if (you.last_unequip == to_slot)
+        you.last_unequip = from_slot;
 
     if (you.cur_talisman == from_slot)
         you.cur_talisman = to_slot;
+    else if (you.cur_talisman == to_slot)
+        you.cur_talisman = from_slot;
 }

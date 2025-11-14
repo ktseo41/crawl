@@ -84,6 +84,11 @@ static bool _ui_coinflip()
     return static_cast<bool>(ui_random(2));
 }
 
+static bool _ui_one_chance_in(int a_million)
+{
+    return ui_random(a_million) == 0;
+}
+
 colour_t random_uncommon_colour()
 {
     colour_t result;
@@ -272,34 +277,20 @@ static int _etc_mangrove(int, const coord_def& loc)
     return col == LIGHTGREEN ? BROWN : col;
 }
 
-bool get_vortex_phase(const coord_def& loc)
-{
-    coord_def center = get_cloud_originator(loc);
-    if (center.origin())
-        return _ui_coinflip(); // source died/went away
-    else
-    {
-        int x = loc.x - center.x;
-        int y = loc.y - center.y;
-        double dir = atan2(x, y)/PI;
-        double dist = sqrt(x*x + y*y);
-        return ((int)floor(dir*2 + dist*0.33 - (you.frame_no % 54)/2.7))&1;
-    }
-}
-
 static int _etc_vortex(int, const coord_def& loc)
 {
-    const bool phase = get_vortex_phase(loc);
-    switch (env.grid(loc))
+    const cloud_info* cloud = env.map_knowledge(loc).cloudinfo();
+    const bool phase = cloud ? (bool)cloud->variety : true;
+    switch (env.map_knowledge(loc).feat())
     {
     case DNGN_LAVA:
-        return phase ? LIGHTRED : one_chance_in(3) ? MAGENTA : RED;
+        return phase ? LIGHTRED : _ui_one_chance_in(3) ? MAGENTA : RED;
     case DNGN_SHALLOW_WATER: // XX color overlap between this and land, how annoying is it?
         return phase ? LIGHTCYAN : CYAN;
     case DNGN_DEEP_WATER:
-        return phase ? BLUE : coinflip() ? LIGHTBLUE : DARKGREY;
+        return phase ? BLUE : _ui_coinflip() ? LIGHTBLUE : DARKGREY;
     default:
-        return phase ? WHITE : one_chance_in(3) ? LIGHTCYAN : LIGHTGREY;
+        return phase ? WHITE : _ui_one_chance_in(3) ? LIGHTCYAN : LIGHTGREY;
     }
 }
 

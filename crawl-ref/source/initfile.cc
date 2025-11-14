@@ -469,11 +469,11 @@ const vector<GameOption*> game_options::build_options_list()
         new BoolGameOption(easy_unequip,
                            { "easy_unequip", "easy_armour", "easy_armor" },
                            true),
-        new BoolGameOption(SIMPLE_NAME(equip_unequip), false),
+        new BoolGameOption(SIMPLE_NAME(equip_unequip), true),
         new BoolGameOption(SIMPLE_NAME(jewellery_prompt), false),
         new BoolGameOption(SIMPLE_NAME(easy_door), true),
         new BoolGameOption(SIMPLE_NAME(warn_hatches), false),
-        new BoolGameOption(SIMPLE_NAME(warn_contam_cost), false),
+        new BoolGameOption(SIMPLE_NAME(warn_contam_cost), true),
         new BoolGameOption(SIMPLE_NAME(show_resist_percent), true),
         new BoolGameOption(SIMPLE_NAME(always_show_doom_contam), false),
         new BoolGameOption(SIMPLE_NAME(enable_recast_spell), true),
@@ -1068,7 +1068,11 @@ object_class_type item_class_by_sym(char32_t c)
         return OBJ_RODS;
 #endif
     case U'\x2666': // ♦
+    case 'G':
         return OBJ_GEMS;
+    case U'\x2022': // •
+    case 'B':
+        return OBJ_BAUBLES;
     default:
         return NUM_OBJECT_CLASSES;
     }

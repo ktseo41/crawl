@@ -71,7 +71,7 @@ LUAFN(l_spells_mana_cost)
 LUAFN(l_spells_range)
 {
     spell_type spell = spell_by_name(luaL_checkstring(ls, 1), false);
-    PLUARET(number, spell_range(spell, calc_spell_power(spell)));
+    PLUARET(number, spell_range(spell, &you));
 }
 
 /*** The maximum range of the spell.
@@ -82,7 +82,7 @@ LUAFN(l_spells_range)
 LUAFN(l_spells_max_range)
 {
     spell_type spell = spell_by_name(luaL_checkstring(ls, 1), false);
-    PLUARET(number, spell_range(spell, spell_power_cap(spell)));
+    PLUARET(number, calc_spell_range(spell, spell_power_cap(spell), true));
 }
 
 /*** The minimum range of the spell.
@@ -93,20 +93,20 @@ LUAFN(l_spells_max_range)
 LUAFN(l_spells_min_range)
 {
     spell_type spell = spell_by_name(luaL_checkstring(ls, 1), false);
-    PLUARET(number, spell_range(spell, 0));
+    PLUARET(number, calc_spell_range(spell, 0, true));
 }
 
 
 /*** If this spell is aimed at (x,y), what path will it actually take?
- * @tparam string spell name
+ * @tparam string spell the name of the spell
  * @tparam int x coordinate to aim at, in player coordinates
  * @tparam int y coordinate to aim at, in player coordinates
- * @tparam int x coordinate of spell source, in player coordinates (default=0)
- * @tparam int y coordinate of spell source, in player coordinates (default=0)
- * @tparam boolean[opt=false] if true, have the spell aim at the target; if
- *                            false, shoot past it.
+ * @tparam[opt=0] int source_x coordinate of spell source, in player coordinates
+ * @tparam[opt=0] int source_y coordinate of spell source, in player coordinates
+ * @tparam[opt=true] boolean aimed_at_spot if true, aim at the target; if
+ * false, shoot past it.
  * @treturn table|nil a table of {x,y} of the path the spell will take, in
- *                    player coordinates.
+ * player coordinates.
  * Nil is returned if the spell does not follow a path (eg. smite-targeted
  * spells) or if the spell has zero range.
  * @function path
@@ -116,7 +116,7 @@ LUAFN(l_spells_path)
     spell_type spell = spell_by_name(luaL_checkstring(ls, 1), false);
     zap_type zap = spell_to_zap(spell);
     int power = calc_spell_power(spell);
-    int range = spell_range(spell, power);
+    int range = calc_spell_range(spell, power, true);
     // return nil for non-zap or zero-range spells
     if (range <= 0 || zap >= NUM_ZAPS)
     {

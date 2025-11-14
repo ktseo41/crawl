@@ -1098,6 +1098,9 @@ string get_god_likes(god_type which_god)
     case GOD_ZIN:
         likes.emplace_back("you donate money");
         break;
+    case GOD_OKAWARU:
+        really_likes.emplace_back("you kill challenging foes");
+        break;
     default:
         break;
     }
@@ -1187,6 +1190,23 @@ void did_hurt_monster(const monster &victim, int damage_done,
         int bonus = min(victim.hit_points, min(damage_done, victim.max_hit_points / 2));
         you.props[BEOGH_DAMAGE_DONE_KEY].get_int() += bonus;
     }
+}
+
+/**
+ * Will this god definitely be upset if you memorise spells?
+ *
+ * This is as opposed to a likelihood.
+ *
+ * @param spell the spell to be cast
+ * @param god   the god to check against
+ * @returns true if you will definitely lose piety/get penance/be excommunicated
+ */
+bool god_punishes_memorising_spells(god_type god)
+{
+    if (map_find(divine_peeves[god], DID_SPELL_MEMORISE))
+        return true;
+
+    return false;
 }
 
 /**

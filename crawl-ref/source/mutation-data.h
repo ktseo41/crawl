@@ -222,7 +222,7 @@ static const mutation_def mut_data[] =
 { MUT_SHOCK_VULNERABILITY, 2, 1, mutflag::bad | mutflag::substance,
   "electricity vulnerability",
 
-  {"You are vulnerable to electric shocks.", "", ""},
+  {"You are vulnerable to electric shocks. (rElec-)", "", ""},
   {"You feel vulnerable to electricity.", "", ""},
   {"You feel less vulnerable to electricity.", "", ""},
   TILEG_MUT_SHOCK_VULNERABILITY,
@@ -264,7 +264,7 @@ static const mutation_def mut_data[] =
    {"You can sometimes gain power from killing poisoned or drained foes.",
     "You can regularly gain power from killing poisoned or drained foes.", ""},
    {"Vile energies swirl pleasantly through your soul.",
-    "The vile energy whirl more vigorously through your soul.", ""},
+    "The vile energy whirls more vigorously through your soul.", ""},
    {"The vile energy swirling through your soul dissipates.",
     "The vile energy whirling through your soul weakens.", ""},
     TILEG_MUT_FEED_OFF_SUFFERING,
@@ -276,6 +276,7 @@ static const mutation_def mut_data[] =
    {"You discover slightly more artefacts.", "You discover more artefacts.", ""},
    {"You feel fortune smile upon you.", "You feel fortune smile more brightly upon you.", ""},
    {"You feel like your luck has run out.", "You feel a little less lucky.", ""},
+    TILEG_MUT_LUCKY,
 },
 
 #if TAG_MAJOR_VERSION == 34
@@ -588,7 +589,8 @@ static const mutation_def mut_data[] =
   TILEG_MUT_CLARITY
 },
 
-{ MUT_BERSERK, 7, 2, mutflag::bad,
+#if TAG_MAJOR_VERSION == 34
+{ MUT_BERSERK, 0, 2, mutflag::bad,
   "berserk",
 
   {"You sometimes lose your temper in combat.",
@@ -602,8 +604,8 @@ static const mutation_def mut_data[] =
   {"You feel a little more calm.",
    "You feel a little less angry.",
    ""},
-  TILEG_MUT_BERSERK,
 },
+#endif
 
 { MUT_POOR_CONSTITUTION, 10, 2, mutflag::bad,
   "poor constitution",
@@ -1272,7 +1274,7 @@ static const mutation_def mut_data[] =
 
   {"A shield forms around you when casting spells or using Invocations. (SH +7)",
     "", ""},
-  {"Ambient excess energy start collecting around you.", "", ""},
+  {"Ambient excess energy starts collecting around you.", "", ""},
   {"The ambient excess energy around you dissipates.", "", ""},
   TILEG_MUT_EPHEMERAL_SHIELD,
 },
@@ -1636,6 +1638,15 @@ static const mutation_def mut_data[] =
    ""},
 
   TILEG_MUT_NO_POTION_HEAL,
+},
+
+{ MUT_RECKLESS, 2, 1, mutflag::bad,
+   "reckless",
+
+   {"Your SH is halved, but you deal more damage with two-handed weapons.", "", ""},
+   {"You feel a sudden disregard for your own safety.", "", ""},
+   {"You feel a little less reckless.", "", ""},
+   TILEG_MUT_RECKLESS,
 },
 
 // Scale mutations

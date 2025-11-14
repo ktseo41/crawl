@@ -123,8 +123,9 @@ public:
     uint32_t client_id;                // for ID of monster_info between turns
     static uint32_t last_client_id;
 
-    bool went_unseen_this_turn;
-    coord_def unseen_pos;
+    bool revealed_this_turn;
+    coord_def revealed_at_pos;
+    level_id origin_level;
 
 public:
     void set_new_monster_id();
@@ -263,8 +264,10 @@ public:
     int      get_experience_level() const override;
     god_type deity() const override;
     bool     alive() const override;
+    bool     alive_or_reviving() const override;
     bool     defined() const { return alive(); }
     bool     swimming() const override;
+    bool     swimming(bool energy_cost) const;
 
     bool     can_drown() const;
     bool     floundering_at(const coord_def p) const;
@@ -273,8 +276,10 @@ public:
     bool     extra_balanced() const override;
     bool     can_pass_through_feat(dungeon_feature_type grid) const override;
     bool     can_burrow() const override;
-    bool     can_burrow_through(dungeon_feature_type feat) const;
+    bool     can_burrow_through(const coord_def& pos) const;
+    bool     can_flatten_tree_at(const coord_def& pos) const;
     bool     is_habitable_feat(dungeon_feature_type feat) const override;
+    bool     is_habitable(const coord_def &_pos) const override;
     bool     shove(const char* name = "") override;
 
     size_type   body_size(size_part_type psize = PSIZE_TORSO,
@@ -405,6 +410,7 @@ public:
     bool no_tele(bool blink = false, bool /*temp*/ = true) const override;
     bool antimagic_susceptible() const override;
 
+    bool clarity(bool items = true) const override;
     bool stasis() const override;
     bool cloud_immune(bool items = true) const override;
     bool damage_immune(const actor* source = nullptr) const;
@@ -506,6 +512,7 @@ public:
     void put_to_sleep(actor *attacker, int duration = 0, bool hibernate = false)
         override;
     void weaken(const actor *attacker, int pow) override;
+    void diminish(const actor *attacker, int pow) override;
     bool strip_willpower(actor *attacker, int dur, bool quiet = false) override;
     void daze(int duration) override;
     void vitrify(const actor *attacker, int duration, bool quiet = false) override;

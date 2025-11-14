@@ -992,28 +992,7 @@ static bool _update_statuses(player_info& c)
     status_info inf;
     for (unsigned int status = 0; status <= STATUS_LAST_STATUS; ++status)
     {
-        if (status == DUR_ICEMAIL_DEPLETED)
-        {
-            inf = status_info();
-            if (you.duration[status] <= ICEMAIL_TIME / ICEMAIL_MAX)
-                continue;
-            inf.short_text = "icemail depleted";
-        }
-        else if (status == DUR_ACROBAT)
-        {
-            inf = status_info();
-            if (!acrobat_boost_active())
-                continue;
-            inf.short_text = "acrobatic";
-        }
-        else if (status == DUR_PARRYING)
-        {
-            inf = status_info();
-            if (!parrying_boost_active())
-                continue;
-            inf.short_text = "parrying";
-        }
-        else if (!fill_status_info(status, inf)) // this will reset inf itself
+        if (!fill_status_info(status, inf)) // this will reset inf itself
             continue;
 
         if (!inf.light_text.empty() || !inf.short_text.empty())
@@ -1141,6 +1120,10 @@ void TilesFramework::_send_player(bool force_full)
     _update_int(force_full, c.evasion, you.evasion_scaled(1), "ev");
     _update_int(force_full, c.shield_class, player_displayed_shield_class(),
                 "sh");
+
+    _update_int(force_full, c.ac_boost, you.temp_ac_mod(), "ac_mod");
+    _update_int(force_full, c.ev_boost, you.temp_ev_mod(), "ev_mod");
+    _update_int(force_full, c.sh_boost, you.temp_sh_mod(), "sh_mod");
 
     _update_int(force_full, c.strength, (int8_t) you.strength(false), "str");
     _update_int(force_full, c.intel, (int8_t) you.intel(false), "int");

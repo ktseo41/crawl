@@ -462,9 +462,9 @@ spret cast_percussive_tempering(const actor& caster, monster& target, int power,
     return spret::success;
 }
 
-bool is_valid_tempering_target(const monster& mon, const actor& caster)
+bool is_valid_tempering_target(const monster& mon, const actor& caster, bool ignore_temp)
 {
-    if (!mon.was_created_by(caster) || mon.has_ench(ENCH_TEMPERED))
+    if (!mon.was_created_by(caster) || (!ignore_temp && mon.has_ench(ENCH_TEMPERED)))
         return false;
 
     mon_enchant summ = mon.get_ench(ENCH_SUMMON);
@@ -604,7 +604,7 @@ static bool _gloom_affect_target(actor *victim, const actor *agent, int pow)
 
 spret cast_gloom(const actor *caster, int pow, bool fail, bool tracer)
 {
-    int range = spell_range(SPELL_GLOOM, pow, caster->is_player());
+    int range = spell_range(SPELL_GLOOM, caster, pow);
     auto vulnerable = [caster](const actor *act) -> bool
     {
         // No fedhas checks needed, plants can't be blinded by this.

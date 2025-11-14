@@ -40,7 +40,8 @@ int create_item_named(string name, coord_def pos, string *error)
     trim_string(name);
 
     item_list ilist;
-    const string err = ilist.add_item(name, false);
+    // Create the specified item regardless of whether it's excluded.
+    const string err = ilist.add_item(name, false, true);
     if (!err.empty())
     {
         if (error)
@@ -333,14 +334,14 @@ bool is_weapon_brand_ok(int type, int brand, bool /*strict*/)
     case SPWPN_DISTORTION:
     case SPWPN_SPECTRAL:
     case SPWPN_REAPING:
-    case SPWPN_FOUL_FLAME: // only exists on Brilliance
+    case SPWPN_FOUL_FLAME: // only exists on Pan lords/Brilliance
         if (is_range_weapon(item))
             return false;
         break;
 
     // Ranged-only brands.
     case SPWPN_PENETRATION:
-    case SPWPN_ACID: // Only exists on Punk
+    case SPWPN_ACID: // only exists on acidic bite/Punk
         if (!is_range_weapon(item))
             return false;
         break;
@@ -689,6 +690,34 @@ static void _generate_missile_item(item_def& item, int force_type,
     item.quantity = random_range(2, 6);
 }
 
+// Increment a given artprop on a given item while ensuring it doesn't overflow
+// sensible values.
+static void _increment_artprop(item_def& item, artefact_prop_type prop, int value)
+{
+    ASSERT(value > 0);
+
+    short& val = item.props[ARTEFACT_PROPS_KEY].get_vector()[prop].get_short();
+    val += value;
+
+    if (artp_value_type(prop) == ARTP_VAL_BOOL)
+        val = min((short)1, val);
+    else
+    {
+        switch (prop)
+        {
+            case ARTP_FIRE:
+            case ARTP_COLD:
+            case ARTP_WILLPOWER:
+            case ARTP_NEGATIVE_ENERGY:
+                val = min((short)3, val);
+                break;
+
+            default:
+                break;
+        }
+    }
+}
+
 static bool _try_make_armour_artefact(item_def& item, int force_type,
                                       int item_level, int agent)
 {
@@ -754,8 +783,14 @@ static bool _try_make_armour_artefact(item_def& item, int force_type,
     {
         artefact_prop_type prop = ego_to_artprop(static_cast<special_armour_type>(old_ego));
 
+        // This requires special handling since it maps to a *pair* of artprops at once.
+        if (old_ego == SPARM_RESISTANCE)
+        {
+            _increment_artprop(item, ARTP_FIRE, 1);
+            _increment_artprop(item, ARTP_COLD, 1);
+        }
         // Egos that have no corresponding artprop can stay intact
-        if (prop == ARTP_NUM_PROPERTIES)
+        else if (prop == ARTP_NUM_PROPERTIES)
             set_artefact_brand(item, old_ego);
         else
         {
@@ -767,19 +802,11 @@ static bool _try_make_armour_artefact(item_def& item, int force_type,
                 case ARTP_INTELLIGENCE:
                 case ARTP_DEXTERITY:
                 case ARTP_AC:
-                    item.props[ARTEFACT_PROPS_KEY].get_vector()[prop].get_short() += 3;
+                    _increment_artprop(item, prop, 3);
                     break;
 
                 default:
-                {
-                    short& val = item.props[ARTEFACT_PROPS_KEY].get_vector()[prop].get_short();
-
-                    // Make sure not to 'hide' a second level of a boolean artprop
-                    if (artp_value_type(prop) == ARTP_VAL_BOOL)
-                        val = 1;
-                    else
-                        val += 1;
-                }
+                    _increment_artprop(item, prop, 1);
             }
         }
     }
@@ -875,12 +902,14 @@ bool is_armour_brand_ok(int type, int brand, bool strict)
 
     case SPARM_FIRE_RESISTANCE:
     case SPARM_COLD_RESISTANCE:
+        if (type == ARM_SCARF)
+            return false;
+        // deliberate fall-through
     case SPARM_RESISTANCE:
-        if (type == ARM_FIRE_DRAGON_ARMOUR
-            || type == ARM_ICE_DRAGON_ARMOUR
-            || type == ARM_GOLDEN_DRAGON_ARMOUR)
+        if (type == ARM_FIRE_DRAGON_ARMOUR || type == ARM_ICE_DRAGON_ARMOUR
+            || type == ARM_GOLDEN_DRAGON_ARMOUR || type == ARM_ORB)
         {
-            return false; // contradictory or redundant
+            return false; // contradictory, redundant, or overriding other bits
         }
         return true; // in portal vaults, these can happen on every slot
 
@@ -893,8 +922,8 @@ bool is_armour_brand_ok(int type, int brand, bool strict)
         if (type == ARM_PEARL_DRAGON_ARMOUR && brand == SPARM_POSITIVE_ENERGY)
             return false; // contradictory or redundant
 
-        return slot == SLOT_BODY_ARMOUR || slot == SLOT_OFFHAND || slot == SLOT_CLOAK
-                       || !strict;
+        return slot == SLOT_BODY_ARMOUR || slot == SLOT_OFFHAND && type != ARM_ORB
+                       || slot == SLOT_CLOAK && type != ARM_SCARF || !strict;
 
     case SPARM_SPIRIT_SHIELD:
         return
@@ -1634,15 +1663,19 @@ static bool _try_make_jewellery_unrandart(item_def& item, int force_type,
 }
 
 /**
- * A 'good' plus for stat rings is GOOD_STAT_RING_PLUS, for other rings it's
- * GOOD_RING_PLUS.
+ * Generate an appropriate 'plus' value for a given type of jewellery.
+ * Currently only rings use non-zero plus values, with stat rings usings
+ * GOOD_STAT_RING_PLUS, protection/slaying using GOOD_RING_PLUS, and evasion
+ * using its own value.
  *
- * @param subtype       The type of ring in question.
- * @return              4, 5 or 6.
- *                      (minor numerical variations are boring.)
+ * @param subtype       The type of jewellery in question.
+ * @return              A 'plus' for that jewellery.
  */
-static short _good_jewellery_plus(int subtype)
+short determine_jewellery_plus(int subtype)
 {
+    if (!jewellery_type_has_pluses(subtype))
+        return 0;
+
     switch (subtype)
     {
         case RING_STRENGTH:
@@ -1654,20 +1687,6 @@ static short _good_jewellery_plus(int subtype)
         default:
             return GOOD_RING_PLUS;
     }
-}
-
-/**
- * Generate a random 'plus' for a given type of ring.
- *
- * @param subtype       The type of ring in question.
- * @return              A 'plus' for that ring. 0 for most types.
- */
-static short _determine_ring_plus(int subtype)
-{
-    if (!jewellery_type_has_plusses(subtype))
-        return 0;
-
-    return _good_jewellery_plus(subtype);
 }
 
 // Choose a random ring type compatible with any fixed artprops. If no ring
@@ -1694,7 +1713,6 @@ static void _roll_amulet_type(item_def& item)
         if (are_fixed_props_ok(item))
             return;
     }
-
 }
 
 static void _generate_jewellery_item(item_def& item, bool allow_uniques,
@@ -1723,7 +1741,7 @@ static void _generate_jewellery_item(item_def& item, bool allow_uniques,
     else
         _roll_amulet_type(item);
 
-    item.plus = _determine_ring_plus(item.sub_type);
+    item.plus = determine_jewellery_plus(item.sub_type);
 
     // All jewellery base types should now work. - bwr
     if (item_level == ISPEC_RANDART
@@ -1948,9 +1966,9 @@ static void _setup_fallback_randart(const int unrand_id,
         && !_ego_unrand_only(item.base_type, unrand.prpty[ARTP_BRAND])
         && item.base_type == unrand.base_type // brand isn't well-defined for != case
         && ((item.base_type == OBJ_WEAPONS
-             && is_weapon_brand_ok(item.sub_type, unrand.prpty[ARTP_BRAND], true))
+             && is_weapon_brand_ok(force_type, unrand.prpty[ARTP_BRAND], true))
             || (item.base_type == OBJ_ARMOUR
-             && is_armour_brand_ok(item.sub_type, unrand.prpty[ARTP_BRAND], true))))
+             && is_armour_brand_ok(force_type, unrand.prpty[ARTP_BRAND], true))))
     {
         // maybe do jewellery too?
         item.brand = unrand.prpty[ARTP_BRAND];
@@ -2294,8 +2312,10 @@ void item_set_appearance(item_def &item)
 
 void lucky_upgrade_item(item_def& item)
 {
-    // Only have a chance to discover a better item on first spotting it.
-    if (item.flags & ISFLAG_SEEN)
+    // Only have a chance to discover a better item on first spotting it (and
+    // not for items that are already artefacts - which is harmless, but
+    // produces confusing messages).
+    if (item.flags & (ISFLAG_SEEN | ISFLAG_ARTEFACT_MASK))
         return;
 
     // 2-4% chance of upgrading an item.

@@ -9,6 +9,8 @@
 # extremely long headers, so we put them here.
 ##############################################################################
 
+: crawl_require('dlua/vault.lua')
+
 ##############################################################################
 # 37 x 22 -- this one is huge and twisted, but it's also old...
 NAME:   dpeg_arrival_water_fire
@@ -627,10 +629,10 @@ ENDMAP
 NAME:    dpeg_arrival_caged_fury
 TAGS:    arrival no_rotate
 ORIENT:  float
-MONS:    w:30 nothing / giant cockroach / w:2 ribbon worm
+MONS:    w:30 nothing / clockroach / w:2 ribbon worm
 MONS:    w:30 nothing / endoplasm
 MONS:    w:20 nothing / jackal / rat
-MONS:    w:30 nothing / endoplasm / w:2 jelly / giant cockroach / w:2 ribbon worm / \
+MONS:    w:30 nothing / endoplasm / w:2 jelly / dart slug / w:2 ribbon worm / \
          w:5 jackal / w:5 rat
 FTILE:   1234ABCDEabcdem = floor_dirt
 SHUFFLE: abcde / fghij
@@ -812,7 +814,7 @@ NAME:    nagdon_arrival_zigzag_paths
 TAGS:    arrival no_trap_gen no_monster_gen
 ORIENT:  float
 MONS:    plant, toadstool
-ITEM:    orc skeleton / kobold skeleton / goblin skeleton / place:D:1 skeleton
+: item(vault_species_skeletons(_G, "early"))
 : if crawl.one_chance_in(3) then
   SUBST:   GHIJ = x
   SUBST:   " = .

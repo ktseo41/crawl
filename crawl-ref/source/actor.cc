@@ -50,14 +50,6 @@ level_id actor::shaft_dest() const
     return generic_shaft_dest(level_id::current());
 }
 
-/**
- * Check if the actor is on the ground (or in water).
- */
-bool actor::ground_level() const
-{
-    return !airborne();
-}
-
 // Give hands required to wield weapon.
 hands_reqd_type actor::hands_reqd(const item_def &item, bool base) const
 {
@@ -104,7 +96,8 @@ int actor::skill_rdiv(skill_type sk, int mult, int div) const
 
 int actor::wearing_jewellery(int sub_type) const
 {
-    return wearing(OBJ_JEWELLERY, sub_type, ring_plusses_matter(sub_type),
+    return wearing(OBJ_JEWELLERY, sub_type,
+                   jewellery_type_has_pluses(sub_type),
                    sub_type == AMU_REGENERATION || sub_type == AMU_MANA_REGENERATION);
 }
 
@@ -259,8 +252,6 @@ bool actor::has_notele_item(vector<const item_def *> *matches) const
 int actor::angry(bool items) const
 {
     int anger = 0;
-    if (is_player() && you.has_mutation(MUT_BERSERK))
-        anger += pow(3, you.get_mutation_level(MUT_BERSERK));
 
     if (!items)
         return anger;
@@ -343,11 +334,10 @@ int actor::spirit_shield(bool items) const
     return ss;
 }
 
-bool actor::rampaging() const
+int actor::rampaging() const
 {
     return wearing_ego(OBJ_ARMOUR, SPARM_RAMPAGING)
-           || scan_artefacts(ARTP_RAMPAGING)
-           || you.duration[DUR_EXECUTION];
+           + scan_artefacts(ARTP_RAMPAGING);
 }
 
 int actor::apply_ac(int damage, int max_damage, ac_type ac_rule, bool for_real) const
@@ -1070,12 +1060,8 @@ bool actor::knockback(const actor &cause, int dist, int dmg, string source_name)
         ray.advance();
 
         newpos = ray.pos();
-        if (newpos == oldray.pos()
-            || !in_bounds(newpos)
-            || cell_is_solid(newpos)
-            || actor_at(newpos)
-            || !can_pass_through(newpos)
-            || !is_habitable(newpos))
+        if (newpos == oldray.pos() || actor_at(newpos)
+            || !in_bounds(newpos) || !is_habitable(newpos))
         {
             ray = oldray;
             break;
@@ -1128,14 +1114,8 @@ coord_def actor::stumble_pos(coord_def targ) const
     if (!adjacent(newpos, oldpos)) // !?
         return coord_def();
 
-    // copied from actor::knockback, ew
-    if (!in_bounds(newpos)
-        || cell_is_solid(newpos)
-        || !can_pass_through(newpos)
-        || !is_habitable(newpos))
-    {
+    if (!in_bounds(newpos) || !is_habitable(newpos))
         return coord_def();
-    }
 
     const actor* other = actor_at(newpos);
     if (other && can_see(*other))

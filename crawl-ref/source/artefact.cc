@@ -365,24 +365,26 @@ static void _populate_staff_intrinsic_artps(stave_type staff,
         proprt[*prop] = 1;
 }
 
-/// The artefact properties corresponding to a given base item.
-struct artp_value
+// An artefact property with an intrinsic value for some base item type.
+struct intrinsic_artp
 {
-    /// The artp matching the item (e.g. ARTP_AC for RING_PROTECTION)
+    // The artp for the item's intrinsic value (e.g. ARTP_AC for
+    // RING_PROTECTION).
     artefact_prop_type  type;
-    /// The value of the artp. (E.g. '9' for RING_MAGICAL_POWER.) If set to 0,
-    /// uses item.plus instead.
+    // The intrinsic value of the artp (e.g. '9' for RING_MAGICAL_POWER).
     int                 value;
+    // Does this item use its plus value for this intrinsic property?
+    bool                uses_plus;
 };
 
-static map<jewellery_type, vector<artp_value>> jewellery_artps = {
+static map<jewellery_type, vector<intrinsic_artp>> jewellery_artps = {
     { AMU_REGENERATION, { { ARTP_REGENERATION, 1 } } },
-    { AMU_MANA_REGENERATION, { { ARTP_MANA_REGENERATION, 1} } },
-    { AMU_REFLECTION, { { ARTP_SHIELDING, AMU_REFLECT_SH / 2} } },
+    { AMU_MANA_REGENERATION, { { ARTP_MANA_REGENERATION, 1 } } },
+    { AMU_REFLECTION, { { ARTP_SHIELDING, AMU_REFLECT_SH / 2 } } },
     { AMU_ACROBAT, { { ARTP_ACROBAT, 1 } } },
 
     { RING_MAGICAL_POWER, { { ARTP_MAGICAL_POWER, 9 } } },
-    { RING_WIZARDRY, { { ARTP_WIZARDRY, 1} } },
+    { RING_WIZARDRY, { { ARTP_WIZARDRY, 1 } } },
     { RING_FLIGHT, { { ARTP_FLY, 1 } } },
     { RING_SEE_INVISIBLE, { { ARTP_SEE_INVISIBLE, 1 } } },
     { RING_STEALTH, { { ARTP_STEALTH, 1 } } },
@@ -394,12 +396,20 @@ static map<jewellery_type, vector<artp_value>> jewellery_artps = {
     { RING_WILLPOWER, { { ARTP_WILLPOWER, 1 } } },
     { RING_RESIST_CORROSION, { { ARTP_RCORR, 1 } } },
 
-    { RING_STRENGTH, { { ARTP_STRENGTH, 0 } } },
-    { RING_INTELLIGENCE, { { ARTP_INTELLIGENCE, 0 } } },
-    { RING_DEXTERITY, { { ARTP_DEXTERITY, 0 } } },
-    { RING_PROTECTION, { { ARTP_AC, 0 } } },
-    { RING_EVASION, { { ARTP_EVASION, 0 } } },
-    { RING_SLAYING, { { ARTP_SLAYING, 0 } } },
+    { RING_STRENGTH, { { ARTP_STRENGTH,
+                         determine_jewellery_plus(RING_STRENGTH), true } } },
+    { RING_INTELLIGENCE, { { ARTP_INTELLIGENCE,
+                             determine_jewellery_plus(RING_INTELLIGENCE),
+                             true } } },
+    { RING_DEXTERITY, { { ARTP_DEXTERITY,
+                          determine_jewellery_plus(RING_DEXTERITY), true } } },
+    { RING_PROTECTION, { { ARTP_AC,
+                           determine_jewellery_plus(RING_PROTECTION),
+                           true } } },
+    { RING_EVASION, { { ARTP_EVASION,
+                        determine_jewellery_plus(RING_EVASION), true } } },
+    { RING_SLAYING, { { ARTP_SLAYING,
+                        determine_jewellery_plus(RING_SLAYING), true } } },
 };
 
 /**
@@ -412,19 +422,27 @@ static void _populate_jewel_intrinsic_artps(const item_def &item,
                                             artefact_properties_t &props)
 {
     const jewellery_type jewel = (jewellery_type)item.sub_type;
-    vector<artp_value> *artps = map_find(jewellery_artps, jewel);
+    auto artps = map_find(jewellery_artps, jewel);
     if (!artps)
         return;
 
     for (const auto &artp : *artps)
-        props[artp.type] += artp.value ? artp.value : item.plus;
+    {
+        // The item's plus contains the value intrinsic to the item, but it may
+        // not be set to its standard value until later. So use that value when
+        // plus is zero.
+        if (artp.uses_plus)
+            props[artp.type] += item.plus ? item.plus : artp.value;
+        else
+            props[artp.type] += artp.value;
+    }
 }
 
 // XXX: Building this directly from form data would be nice.
 // Note: Negative resistances are intentionally left off multiple forms so that
 //       it is possible to generate randarts that give that resistance, which
 //       I think is still an appropriate bonus.
-static map<talisman_type, vector<artp_value>> talisman_artps = {
+static map<talisman_type, vector<intrinsic_artp>> talisman_artps = {
     { TALISMAN_INKWELL,     {{ARTP_POISON, 1}}},
     { TALISMAN_RIMEHORN,    {{ARTP_COLD, 2}}},
     { TALISMAN_SCARAB,      {{ARTP_FIRE, 2}}},
@@ -452,12 +470,17 @@ static void _populate_talisman_intrinsic_artps(const item_def &item,
                                                artefact_properties_t &props)
 {
     const talisman_type talisman = (talisman_type)item.sub_type;
-    vector<artp_value> *artps = map_find(talisman_artps, talisman);
+    auto *artps = map_find(talisman_artps, talisman);
     if (!artps)
         return;
 
     for (const auto &artp : *artps)
-        props[artp.type] += artp.value ? artp.value : item.plus;
+    {
+        if (artp.uses_plus)
+            props[artp.type] += item.plus ? item.plus : artp.value;
+        else
+            props[artp.type] += artp.value;
+    }
 }
 
 /**
@@ -589,7 +612,103 @@ static bool _any_artps_in_item_props(const vector<artefact_prop_type> &artps,
 }
 
 /**
+ * Is the given artefact property valid to randomly generate on a given item?
+ * Note: this does not handle conflicts between different artprops, or artprops
+ * that could have buggy behaviors on some items. A property that returns false
+ * may be completely valid to be forcibly placed on the item.
+ *
+ * See _artp_can_go_on_item() and _randart_is_conflicting() for harder vetos.
+ *
+ * @param prop          The artefact property in question
+ * @param item          The item for which to consider whether to randomly
+ *                      generate this artprop.
+ *
+ * @return              Whether it is okay to randomly select the given artprop
+ *                      to put on this item.
+ */
+static bool _artp_can_randomly_generate(artefact_prop_type prop, const item_def& item)
+{
+    const object_class_type item_class = item.base_type;
+    // Categorise items by whether they're quick to swap or not. Some artefact
+    // properties aren't appropriate on easily swappable items.
+    const bool non_swappable = item_class == OBJ_ARMOUR
+                               || item_class == OBJ_TALISMANS
+                               || item_class == OBJ_JEWELLERY
+                                  && jewellery_is_amulet(item);
+
+    switch (prop)
+    {
+        // weapons already have slaying. feels weird on staves
+        case ARTP_SLAYING:
+            return item_class != OBJ_WEAPONS && item_class != OBJ_STAVES;
+
+        case ARTP_REGENERATION:
+        case ARTP_PREVENT_TELEPORTATION:
+        case ARTP_INVISIBLE:
+        case ARTP_HARM:
+        case ARTP_RAMPAGING:
+            return non_swappable;
+
+        case ARTP_MAGICAL_POWER:
+            return item_class != OBJ_WEAPONS && item_class != OBJ_STAVES;
+
+        case ARTP_SILENCE:
+            return non_swappable
+                && !item.is_type(OBJ_JEWELLERY, AMU_MANA_REGENERATION);
+
+        // prevent on armour/talismans (since they're swapped infrequently) and
+        // rings (since 2 slots reduces the pressure to swap)
+        case ARTP_FRAGILE:
+            return item_class != OBJ_ARMOUR
+                   && item_class != OBJ_TALISMANS
+                   && (item_class != OBJ_JEWELLERY
+                       || jewellery_is_amulet(item));
+
+        // Currently only weapons/armour get actual compensation for this prop.
+        case ARTP_BANE:
+            return item_class == OBJ_ARMOUR || item_class == OBJ_WEAPONS;
+
+        case ARTP_ARCHMAGI:
+            return item.is_type(OBJ_ARMOUR, ARM_ROBE);
+
+        case ARTP_ENHANCE_CONJ:
+        case ARTP_ENHANCE_HEXES:
+        case ARTP_ENHANCE_SUMM:
+        case ARTP_ENHANCE_NECRO:
+        case ARTP_ENHANCE_TLOC:
+        case ARTP_ENHANCE_FIRE:
+        case ARTP_ENHANCE_ICE:
+        case ARTP_ENHANCE_AIR:
+        case ARTP_ENHANCE_EARTH:
+        case ARTP_ENHANCE_ALCHEMY:
+        case ARTP_ENHANCE_FORGECRAFT:
+            // Maybe we should allow these for robes, too?  And hats? And
+            // gloves and cloaks and scarves?
+            return item.base_type == OBJ_STAVES
+                     || item.is_type(OBJ_ARMOUR, ARM_ORB)
+                     || prop == ARTP_ENHANCE_EARTH
+                        && (item.is_type(OBJ_ARMOUR, ARM_BOOTS)
+                            || item.is_type(OBJ_ARMOUR, ARM_BARDING))
+                     || prop == ARTP_ENHANCE_FIRE
+                        && item.is_type(OBJ_ARMOUR, ARM_GLOVES)
+                     || prop == ARTP_ENHANCE_AIR
+                        && item.is_type(OBJ_ARMOUR, ARM_CLOAK)
+                     || prop == ARTP_ENHANCE_ICE
+                        && (item.is_type(OBJ_ARMOUR, ARM_HELMET)
+                            || item.is_type(OBJ_ARMOUR, ARM_HAT));
+
+        default:
+            return true;
+    }
+}
+
+/**
  * Can the given artefact property be placed on the given item?
+ *
+ * Note that these are 'hard vetos' that cannot be overcome even by manually
+ * specifying artprops via mapspec. As such, they should be reserved for
+ * functional problems and not "We'd prefer not to randomly generate this."
+ *
  * See also _randart_is_conflicting().
  *
  * @param prop              The artefact property in question (e.g.
@@ -615,7 +734,7 @@ static bool _artp_can_go_on_item(artefact_prop_type prop, int prop_val,
         return true;
 
     // Make sure the new prop value is consistent with the intrinsic one: don't
-    // reduce any positive intrinsic value nor decrease any negative one.
+    // reduce any positive intrinsic value nor increase any negative one.
     const int intrinsic_val = intrinsic_props[prop];
     if (intrinsic_val
             && (intrinsic_val > 0 && prop_val < 0
@@ -625,20 +744,11 @@ static bool _artp_can_go_on_item(artefact_prop_type prop, int prop_val,
     }
 
     const object_class_type item_class = item.base_type;
-    // Categorise items by whether they're quick to swap or not. Some artefact
-    // properties aren't appropriate on easily swappable items.
-    const bool non_swappable = item_class == OBJ_ARMOUR
-                               || item_class == OBJ_TALISMANS
-                               || item_class == OBJ_JEWELLERY
-                                  && jewellery_is_amulet(item);
 
     // warning: using some item calls may not work here, for example,
     // get_weapon_brand; the `item` object is not fully set up.
     switch (prop)
     {
-        // weapons already have slaying. feels weird on staves
-        case ARTP_SLAYING:
-            return item_class != OBJ_WEAPONS && item_class != OBJ_STAVES;
         // prevent properties that conflict with each other
         case ARTP_CORRODE:
             return !_any_artps_in_item_props({ ARTP_RCORR }, intrinsic_props,
@@ -647,14 +757,12 @@ static bool _artp_can_go_on_item(artefact_prop_type prop, int prop_val,
             return !_any_artps_in_item_props({ ARTP_CORRODE }, intrinsic_props,
                                              extant_props);
         case ARTP_MAGICAL_POWER:
-            return item_class != OBJ_WEAPONS && item_class != OBJ_STAVES
-                   || extant_props[ARTP_BRAND] != SPWPN_ANTIMAGIC;
+            return extant_props[ARTP_BRAND] != SPWPN_ANTIMAGIC;
         case ARTP_BLINK:
             return !_any_artps_in_item_props({ ARTP_PREVENT_TELEPORTATION },
                                              intrinsic_props, extant_props);
         case ARTP_PREVENT_TELEPORTATION:
-            return non_swappable
-                   && !_any_artps_in_item_props({ ARTP_BLINK },
+            return !_any_artps_in_item_props({ ARTP_BLINK },
                                                 intrinsic_props, extant_props)
                    && !item.is_type(OBJ_TALISMANS, TALISMAN_STORM);
         // only on melee weapons
@@ -663,37 +771,29 @@ static bool _artp_can_go_on_item(artefact_prop_type prop, int prop_val,
             return item_class == OBJ_WEAPONS && !is_range_weapon(item);
         // could probably loosen artp conflict restrictions?
         case ARTP_SILENCE:
-            return non_swappable
-                && !item.is_type(OBJ_JEWELLERY, AMU_MANA_REGENERATION)
-                && !_any_artps_in_item_props({ ARTP_ENHANCE_CONJ,
+            return !_any_artps_in_item_props({ ARTP_ENHANCE_CONJ,
                     ARTP_ENHANCE_HEXES, ARTP_ENHANCE_SUMM, ARTP_ENHANCE_NECRO,
                     ARTP_ENHANCE_TLOC, ARTP_ENHANCE_FIRE, ARTP_ENHANCE_ICE,
                     ARTP_ENHANCE_AIR, ARTP_ENHANCE_EARTH, ARTP_ENHANCE_ALCHEMY,
                     ARTP_ENHANCE_FORGECRAFT }, intrinsic_props, extant_props);
         case ARTP_REGENERATION:
-            // XXX: regen disabled on talismans because of an untransform crash
-            // related to talismans being slotless
-            return non_swappable && item_class != OBJ_TALISMANS;
-        case ARTP_INVISIBLE:
-        case ARTP_HARM:
-        case ARTP_RAMPAGING:
-            // only on items that can't be quickly swapped
-            return non_swappable;
-        // prevent on armour/talismans (since they're swapped infrequently) and
-        // rings (since 2 slots reduces the pressure to swap)
-        case ARTP_FRAGILE:
-            return item_class != OBJ_ARMOUR
-                   && item_class != OBJ_TALISMANS
-                   && (item_class != OBJ_JEWELLERY
-                       || jewellery_is_amulet(item));
+            // TODO: Regen is disabled on talismans because it's only available
+            // on artefact talismans. Thus, form changes only check artprops via
+            // player-equip.cc:equip_artefact_effect() and
+            // player-equip.cc:unequip_artefact_effect(), and regen is handled
+            // in player_equip():_handle_regen_item_equip(), which is called
+            // outside both of those functions. This means regen currently does
+            // *nothing* on artefact talismans that can only get regen from
+            // artprops, since they use a different codepath from *other*
+            // artefacts that can only get regen from artprops. Also, there's a
+            // hurdle to adding regen to talismans: currently, all checks for
+            // regen items' being attuned require that those items have
+            // corresponding equipment slots, and talismans are slotless.
+            return item_class != OBJ_TALISMANS;
         case ARTP_DRAIN:
         case ARTP_CONTAM:
             return item_class != OBJ_TALISMANS; // TODO: support..?
-        // Currently only weapons/armour get actual compensation for this prop.
-        case ARTP_BANE:
-            return item_class == OBJ_ARMOUR || item_class == OBJ_WEAPONS;
-        case ARTP_ARCHMAGI:
-            return item.is_type(OBJ_ARMOUR, ARM_ROBE);
+
         case ARTP_ENHANCE_CONJ:
         case ARTP_ENHANCE_HEXES:
         case ARTP_ENHANCE_SUMM:
@@ -705,22 +805,8 @@ static bool _artp_can_go_on_item(artefact_prop_type prop, int prop_val,
         case ARTP_ENHANCE_EARTH:
         case ARTP_ENHANCE_ALCHEMY:
         case ARTP_ENHANCE_FORGECRAFT:
-            // Maybe we should allow these for robes, too?  And hats? And
-            // gloves and cloaks and scarves?
-            return (item.base_type == OBJ_STAVES
-                      || item.is_type(OBJ_ARMOUR, ARM_ORB)
-                      || prop == ARTP_ENHANCE_EARTH
-                         && (item.is_type(OBJ_ARMOUR, ARM_BOOTS)
-                             || item.is_type(OBJ_ARMOUR, ARM_BARDING))
-                      || prop == ARTP_ENHANCE_FIRE
-                         && item.is_type(OBJ_ARMOUR, ARM_GLOVES)
-                      || prop == ARTP_ENHANCE_AIR
-                         && item.is_type(OBJ_ARMOUR, ARM_CLOAK)
-                      || prop == ARTP_ENHANCE_ICE
-                         && (item.is_type(OBJ_ARMOUR, ARM_HELMET)
-                             || item.is_type(OBJ_ARMOUR, ARM_HAT)))
-                   && !_any_artps_in_item_props({ ARTP_PREVENT_SPELLCASTING },
-                                                intrinsic_props, extant_props);
+            return !_any_artps_in_item_props({ ARTP_PREVENT_SPELLCASTING },
+                                             intrinsic_props, extant_props);
         default:
             return true;
     }
@@ -1212,8 +1298,11 @@ static void _get_randart_properties(const item_def &item,
     {
         const artefact_prop_type prop = static_cast<artefact_prop_type>(i);
         const string prop_name = artp_name(prop);
-        if (!fixed_props || !fixed_props->exists(prop_name))
+        if ((!fixed_props || !fixed_props->exists(prop_name))
+            && _artp_can_randomly_generate(prop, item))
+        {
             art_prop_weights.emplace_back(prop, artp_data[i].weight);
+        }
     }
 
     // Make sure all weapons have a brand.
@@ -1231,7 +1320,7 @@ static void _get_randart_properties(const item_def &item,
         // Egos that have no corresponding artprop can stay intact (to allow
         // ego-only properties to still generate on randarts), while other
         // properties are removed. (We will let normal artprop weighting handle those.)
-        if (prop == ARTP_NUM_PROPERTIES)
+        if ((prop == ARTP_NUM_PROPERTIES && ego != SPARM_RESISTANCE) || item_always_has_ego(item))
             item_props[ARTP_BRAND] = ego;
     }
 
@@ -1663,41 +1752,15 @@ const unrandart_entry* get_unrand_entry(int unrand_index)
         return &unranddata[unrand_index];
 }
 
-static int _preferred_max_level(int unrand_index)
-{
-    // TODO: turn this into a max preferred level field in art-data.txt
-    switch (unrand_index)
-    {
-    case UNRAND_DELATRAS_GLOVES:
-        return 6;
-    case UNRAND_WOODCUTTERS_AXE:
-    case UNRAND_THROATCUTTER:
-    case UNRAND_HERMITS_PENDANT:
-        return 9;
-    case UNRAND_DEVASTATOR:
-    case UNRAND_RATSKIN_CLOAK:
-    case UNRAND_KRYIAS:
-    case UNRAND_LEAR:
-    case UNRAND_OCTOPUS_KING:
-    case UNRAND_AUGMENTATION:
-    case UNRAND_MEEK:
-    case UNRAND_ELEMENTAL_VULNERABILITY:
-    case UNRAND_MISFORTUNE:
-    case UNRAND_FORCE_LANCE:
-    case UNRAND_VICTORY:
-        return 11;
-    default:
-        return -1;
-    }
-}
-
 static int _unrand_weight(int unrand_index, int item_level)
 {
-    // Early-game unrands (with a preferred max depth != -1) are
+    const unrandart_entry* entry = &unranddata[unrand_index];
+
+    // Early-game unrands (with a preferred max depth != 0) are
     // weighted higher within their depth and lower past it.
     // Normal unrands have a flat weight at all depths.
-    const int pref_max_level = _preferred_max_level(unrand_index);
-    if (pref_max_level == -1)
+    const int pref_max_level = entry->pref_max_level;
+    if (pref_max_level == 0)
         return 10;
     return item_level <= pref_max_level ? 100 : 1;
 }

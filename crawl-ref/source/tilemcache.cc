@@ -386,10 +386,6 @@ bool mcache_monster::get_weapon_offset(tileidx_t mon_tile,
         *ofs_x = 4;
         *ofs_y = 0;
         break;
-    case TILEP_MONS_MARA:
-        *ofs_x = 4;
-        *ofs_y = -5;
-        break;
     // Shift upwards.
     case TILEP_MONS_CENTAUR_WARRIOR_MELEE:
     case TILEP_MONS_HELL_KNIGHT:
@@ -399,7 +395,6 @@ bool mcache_monster::get_weapon_offset(tileidx_t mon_tile,
     case TILEP_MONS_MUMMY_PRIEST:
     case TILEP_MONS_GUARDIAN_MUMMY:
     case TILEP_MONS_DRAUGR_SMALL:
-    case TILEP_MONS_PSYCHE:
     case TILEP_MONS_DUVESSA:
     case TILEP_MONS_DUVESSA_1:
     case TILEP_MONS_JEREMIAH:
@@ -514,6 +509,7 @@ bool mcache_monster::get_weapon_offset(tileidx_t mon_tile,
         *ofs_y = -5;
         break;
     case TILEP_MONS_AMAEMON:
+    case TILEP_MONS_CASSANDRA:
         *ofs_x = -1;
         *ofs_y = -1;
         break;
@@ -611,6 +607,10 @@ bool mcache_monster::get_weapon_offset(tileidx_t mon_tile,
     case TILEP_MONS_REAPER_SCYTHELESS:
         *ofs_x = -2;
         *ofs_y = -6;
+        break;
+    case TILEP_MONS_MARA:
+        *ofs_x = -3;
+        *ofs_y = -3;
         break;
     // Shift upwards and to the right.
     case TILEP_MONS_CLOUD_MAGE:
@@ -732,6 +732,13 @@ bool mcache_monster::get_weapon_offset(tileidx_t mon_tile,
         *ofs_x = -4;
         *ofs_y = 1;
         break;
+    case TILEP_MONS_KOBOLD_GEOMANCER:
+    case TILEP_MONS_KOBOLD_GEOMANCER_1:
+    case TILEP_MONS_KOBOLD_GEOMANCER_2:
+        *ofs_x = -3;
+        *ofs_y = 1;
+        break;
+    case TILEP_MONS_KOBOLD_DEMONOLOGIST:
     case TILEP_MONS_KOBOLD_FLESHCRAFTER:
         *ofs_x = -4;
         *ofs_y = 2;
@@ -979,6 +986,11 @@ bool mcache_monster::get_shield_offset(tileidx_t mon_tile,
     case TILEP_MONS_ORC_APOSTLE_2:
         *ofs_x = 1;
         *ofs_y = 0;
+        break;
+
+    case TILEP_MONS_MARA: // Second weapon
+        *ofs_x = -1;
+        *ofs_y = -5;
         break;
 
     case TILEP_MONS_SAINT_ROKA:
@@ -1518,7 +1530,8 @@ mcache_ghost::mcache_ghost(const monster_info& mon)
     ASSERT(mcache_ghost::valid(mon));
 
     const uint32_t seed = hash32(&mon.mname[0], mon.mname.size())
-                        ^ hash32(&mon.i_ghost, sizeof(mon.i_ghost));
+                        ^ hash32(&mon.i_ghost, sizeof(mon.i_ghost)
+                                             - sizeof(mon.i_ghost.title));
 
     m_doll.parts[TILEP_PART_BASE] = TILEP_SHOW_EQUIP;
     tilep_race_default(mon.i_ghost.species, 0, &m_doll);

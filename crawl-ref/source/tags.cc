@@ -1292,14 +1292,14 @@ static void _shunt_monsters_out_of_walls()
     {
         monster &m(env.mons[i]);
         if (m.alive() && in_bounds(m.pos()) && cell_is_solid(m.pos())
-            && (env.grid(m.pos()) != DNGN_MALIGN_GATEWAY
-                || mons_genus(m.type) != MONS_ELDRITCH_TENTACLE))
+            // Allow wall dwellers
+            && !m.is_habitable(m.pos()))
         {
             for (distance_iterator di(m.pos()); di; ++di)
                 if (!actor_at(*di) && !cell_is_solid(*di))
                 {
 #if TAG_MAJOR_VERSION == 34
-                    // Could have been a rock worm or a dryad.
+                    // Could have been a rock worm or a dryad from old saves.
                     if (m.type != MONS_GHOST)
 #endif
                     mprf(MSGCH_ERROR, "Error: monster %s in %s at (%d,%d)",
@@ -2048,6 +2048,7 @@ static void _tag_construct_you_dungeon(writer &th)
     {
         marshallInt(th, brdepth[j]);
         marshall_level_id(th, brentry[j]);
+        marshallSet(th, branch_uniq_map_tags[j], marshallString);
         marshallInt(th, branch_bribe[j]);
     }
 
@@ -2238,6 +2239,8 @@ static void marshall_level_map_unique_ids(writer &th)
 {
     marshallSet(th, env.level_uniq_maps, marshallString);
     marshallSet(th, env.level_uniq_map_tags, marshallString);
+    // Note: env.current_branch_uniq_map_tags is not persisted, it only needs
+    // to be correct during level generation
 }
 
 static void unmarshall_level_map_unique_ids(reader &th)
@@ -2797,13 +2800,14 @@ static void _fixup_species_mutations(mutation_type mut)
 }
 
 #if TAG_MAJOR_VERSION == 34
-// Copy action counts from one action to another, keeping the sub-action the
-// same. Retain any counts which were already against the "new" action.
+// Copy action counts from one action to another, possibly modifying the
+// sub-action in the process. Retain any counts which were already against the
+// "new" action.
 static void _move_action_count(caction_type old_action, caction_type new_action,
-                               int subtype)
+                               int old_subtype, int new_subtype)
 {
-    pair<caction_type, int> oldkey(old_action, caction_compound(subtype)),
-        newkey(new_action, caction_compound(subtype));
+    pair<caction_type, int> oldkey(old_action, caction_compound(old_subtype)),
+        newkey(new_action, caction_compound(new_subtype));
     if (!you.action_count.count(oldkey))
         return;
     if (!you.action_count.count(newkey))
@@ -4291,8 +4295,17 @@ static void _tag_read_you(reader &th)
 #if TAG_MAJOR_VERSION == 34
     if (th.getMinorVersion() < TAG_MINOR_WU_ABILITIES)
     {
-        _move_action_count(CACT_INVOKE, CACT_ABIL, ABIL_WU_JIAN_LUNGE);
-        _move_action_count(CACT_INVOKE, CACT_ABIL, ABIL_WU_JIAN_WHIRLWIND);
+        _move_action_count(CACT_INVOKE, CACT_ABIL, ABIL_WU_JIAN_LUNGE,
+                                                   ABIL_WU_JIAN_LUNGE);
+        _move_action_count(CACT_INVOKE, CACT_ABIL, ABIL_WU_JIAN_WHIRLWIND,
+                                                   ABIL_WU_JIAN_WHIRLWIND);
+    }
+    if (th.getMinorVersion() < TAG_MINOR_ATTACK_ACTION_COUNTS)
+    {
+        _move_action_count(CACT_ABIL, CACT_ATTACK, ABIL_WU_JIAN_LUNGE,
+                                                   ATTACK_LUNGE);
+        _move_action_count(CACT_ABIL, CACT_ATTACK, ABIL_WU_JIAN_WHIRLWIND,
+                                                   ATTACK_WHIRLWIND);
     }
     if (th.getMinorVersion() >= TAG_MINOR_BRANCHES_LEFT) // 33:17 has it
     {
@@ -5198,6 +5211,10 @@ static void _tag_read_you_dungeon(reader &th)
 #endif
         brentry[j]    = unmarshall_level_id(th);
 #if TAG_MAJOR_VERSION == 34
+        if (th.getMinorVersion() >= TAG_MINOR_BRANCH_UNIQ_MAPS)
+#endif
+            unmarshallSet(th, branch_uniq_map_tags[j], unmarshallString);
+#if TAG_MAJOR_VERSION == 34
         // Have to check this in case of old saves with 6-floor Depths.
         if (th.getMinorVersion() < TAG_MINOR_ZOT_ENTRY_FIXUP
             && j == BRANCH_ZOT
@@ -5217,6 +5234,7 @@ static void _tag_read_you_dungeon(reader &th)
         brdepth[j] = branches[j].numlevels;
         brentry[j] = level_id(branches[j].parent_branch, branches[j].mindepth);
         branch_bribe[j] = 0;
+        branch_uniq_map_tags[j].clear();
     }
 
 #if TAG_MAJOR_VERSION == 34
@@ -6273,7 +6291,7 @@ void marshallMapCell(writer &th, const map_cell &cell)
         cloud_info* ci = cell.cloudinfo();
         marshallUnsigned(th, ci->type);
         marshallUnsigned(th, ci->colour);
-        marshallUnsigned(th, ci->duration);
+        marshallUnsigned(th, ci->variety);
         marshallShort(th, ci->tile);
         marshallUByte(th, ci->killer);
     }
@@ -6341,7 +6359,7 @@ void unmarshallMapCell(reader &th, map_cell& cell)
         cloud_info ci;
         ci.type = (cloud_type)unmarshallUnsigned(th);
         unmarshallUnsigned(th, ci.colour);
-        unmarshallUnsigned(th, ci.duration);
+        unmarshallUnsigned(th, ci.variety);
         ci.tile = unmarshallShort(th);
 #if TAG_MAJOR_VERSION == 34
         if (th.getMinorVersion() >= TAG_MINOR_CLOUD_OWNER)
@@ -6496,8 +6514,9 @@ void marshallMonster(writer &th, const monster& m)
     marshallInt(th, m.foe_memory);
     marshallShort(th, m.damage_friendly);
     marshallShort(th, m.damage_total);
-    marshallByte(th, m.went_unseen_this_turn);
-    marshallCoord(th, m.unseen_pos);
+    marshallByte(th, m.revealed_this_turn);
+    marshallCoord(th, m.revealed_at_pos);
+    marshall_level_id(th, m.origin_level);
 
     if (parts & MP_GHOST_DEMON)
     {
@@ -6976,6 +6995,37 @@ void _tag_construct_level_tiles(writer &th)
     marshallInt(th, TILE_WALL_MAX);
 }
 
+#if TAG_MAJOR_VERSION == 34
+static void _fixup_blood_knowledge(MapKnowledge& map_knowledge)
+{
+    for (rectangle_iterator ri(0); ri; ++ri)
+    {
+        constexpr uint32_t blood_flags = MAP_BLOOD_WEST | MAP_BLOOD_NORTH
+                                         | MAP_OLD_BLOOD;
+        map_knowledge(*ri).flags &= ~blood_flags;
+        if (map_knowledge(*ri).flags & MAP_BLOODY)
+        {
+            if (testbits(env.pgrid(*ri), FPROP_BLOOD_WEST))
+                map_knowledge(*ri).flags |= MAP_BLOOD_WEST;
+            if (testbits(env.pgrid(*ri), FPROP_BLOOD_NORTH))
+                map_knowledge(*ri).flags |= MAP_BLOOD_NORTH;
+            if (testbits(env.pgrid(*ri), FPROP_OLD_BLOOD))
+                map_knowledge(*ri).flags |= MAP_OLD_BLOOD;
+        }
+    }
+}
+
+static void _fixup_cloud_varieties(MapKnowledge& map_knowledge)
+{
+    for (rectangle_iterator ri(0); ri; ++ri)
+    {
+        cloud_info* ci = map_knowledge(*ri).cloudinfo();
+        if (ci && ci->type == CLOUD_VORTEX)
+            ci->variety = get_vortex_phase(*ri);
+    }
+}
+#endif
+
 static void _tag_read_level(reader &th)
 {
     env.floor_colour = unmarshallUByte(th);
@@ -7034,6 +7084,13 @@ static void _tag_read_level(reader &th)
         }
 
 #if TAG_MAJOR_VERSION == 34
+    if (th.getMinorVersion() < TAG_MINOR_FIX_BLOOD_KNOWLEDGE)
+        _fixup_blood_knowledge(env.map_knowledge);
+    if (th.getMinorVersion() <= TAG_MINOR_FIX_POLAR_VORTEX_INFO_LEAK)
+        _fixup_cloud_varieties(env.map_knowledge);
+#endif
+
+#if TAG_MAJOR_VERSION == 34
     if (th.getMinorVersion() < TAG_MINOR_FORGOTTEN_MAP)
         env.map_forgotten.reset();
     else
@@ -7044,6 +7101,13 @@ static void _tag_read_level(reader &th)
         for (int x = 0; x < GXM; x++)
             for (int y = 0; y < GYM; y++)
                 unmarshallMapCell(th, (*f)[x][y]);
+
+#if TAG_MAJOR_VERSION == 34
+        if (th.getMinorVersion() < TAG_MINOR_FIX_BLOOD_KNOWLEDGE)
+            _fixup_blood_knowledge(*f);
+        if (th.getMinorVersion() <= TAG_MINOR_FIX_POLAR_VORTEX_INFO_LEAK)
+            _fixup_cloud_varieties(*f);
+#endif
         env.map_forgotten.reset(f);
     }
     else
@@ -7587,14 +7651,22 @@ void unmarshallMonster(reader &th, monster& m)
 #if TAG_MAJOR_VERSION == 34
     if (th.getMinorVersion() < TAG_MINOR_UNSEEN_MONSTER)
     {
-        m.went_unseen_this_turn = false;
-        m.unseen_pos = coord_def(0, 0);
+        m.revealed_this_turn = false;
+        m.revealed_at_pos = coord_def(0, 0);
     }
     else
     {
 #endif
-    m.went_unseen_this_turn = unmarshallByte(th);
-    m.unseen_pos = unmarshallCoord(th);
+        m.revealed_this_turn = unmarshallByte(th);
+        m.revealed_at_pos = unmarshallCoord(th);
+#if TAG_MAJOR_VERSION == 34
+    }
+    if (th.getMinorVersion() < TAG_MINOR_TRACK_ORIGIN_LEVEL)
+        m.origin_level = level_id::current();
+    else
+    {
+#endif
+        m.origin_level = unmarshall_level_id(th);
 #if TAG_MAJOR_VERSION == 34
     }
 #endif

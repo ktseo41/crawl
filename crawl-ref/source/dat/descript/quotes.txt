@@ -2284,7 +2284,7 @@ Kirke
  shalt not thyself return, but shalt remain there with the others.”
     -Homer, Odysseia
 %%%%
-the Lernaean hydra
+Lernaean hydra
 
 “The second Labour which he undertook was the slaying of the Lernaian Hydra,
  springing from whose single body were fashioned a hundred necks, each bearing
@@ -2399,21 +2399,6 @@ Prince Ribbit
  Princess, youngest princess!
  Open the door for me!”
     -Brothers Grimm (Margaret Hunt), _The Frog King, or Iron Henry_
-%%%%
-Psyche
-
-“Let Psyche's corpse be clad in mourning weed
- And set on rock of yonder hill aloft;
- Her husband is no wight of human seed,
- But serpent dire and fierce, as may be thought,
- Who flies with wings above in starry skies,
- And doth subdue each thing with fiery flight.
- The Gods themselves and powers that seem so wise
- With mighty love be subject to his might.
- The rivers black and deadly floods of pain
- And darkness eke as thrall to him remain.”
-    -Apuleius, _Asinus aureus_, “Cupid and Psyche”. circa. 160 AD.
-    trans. William Adlington, 1566.
 %%%%
 Sigmund
 
@@ -2720,6 +2705,22 @@ battlesphere
  But really I'm not actually your friend
  But I am”
     -They Might Be Giants, “Birdhouse in Your Soul”. 1989.
+%%%%
+bes kemwar
+
+# would prefer a more prose-like passage translating Teoh's Bes Hyang Dney or
+# Werner's Jah-hět of Malaysia, Art and Culture, but until then:
+“The Bès Kěmwar, “maggot spirit”, is one of the many _bès_ or disease spirits
+ known to the Jah Hut of Malaysia. A polyvalent spirit, it is depicted as a
+ maggot or caterpillar, with variants distinguished by hair, thorns, wings, and
+ other details. It eats rice, vegetables, and other crops. It is responsible for
+ aches in bones, joints, and muscles. If its caterpillar hair falls into water
+ and that water is drunk, it causes coughing and bleeding in the throat. Maggot
+ spirits are also known to live in rotten tree trunks and feed in them. Anyone
+ who approaches the fallen tree will be bitten in the leg by the spirit, causing
+ redness, swelling, and itching. All the toenails fall off but the swelling will
+ be gone by two or three months.”
+    - _A Book of Creatures_, 2020.
 %%%%
 boggart
 
@@ -3308,6 +3309,10 @@ kraken
  one doubt that this is the Leviathan of Job?”
     -Jacob Wallenberg, “Min son på galejan”. 1781.
 %%%%
+large abomination
+
+<small abomination>
+%%%%
 lindwurm
 
 “Freilich verbürgt uns keine Silbe die Existenz von solcherlei Thieren, wenn
@@ -3822,13 +3827,14 @@ shadow dragon
 
 “Crux sacra sit mihi lux / Non draco sit mihi dux
  Vade retro satana / Numquam suade mihi vana
- Sunt mala quae libas / Ipse venena bibas”
-        “Let the Holy Cross be my light / Let not the dragon be my guide
-        Step back Satan / Never tempt me with vain things
-        What you offer me is evil / You drink the poison yourself.”
-    -full text of initials on the Saint Benedict Medal, worn to ward off evil
-spririts. Inscription from 11-15th century, formally approved by pope Benedict
-XIV in 18th century
+ Sunt mala quae libas / Ipse venena bibas
+
+ [Let the Holy Cross be my light / Let not the dragon be my guide
+  Step back Satan / Never tempt me with vain things
+  What you offer me is evil / You drink the poison yourself.]”
+    -Full text of initials on the Saint Benedict Medal, worn to ward off evil
+     spirits. Inscription from 11-15th century, formally approved by Pope
+     Benedict XIV in 18th century.
 %%%%
 shadow wraith
 

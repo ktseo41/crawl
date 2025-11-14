@@ -258,10 +258,13 @@ enum monster_type                      // env.mons[].type
 #if TAG_MAJOR_VERSION > 34
     MONS_DEATH_SCARAB,
 #endif
-    MONS_GIANT_COCKROACH,
 #if TAG_MAJOR_VERSION == 34
+    MONS_GIANT_COCKROACH,
     MONS_GIANT_CENTIPEDE,
     MONS_GIANT_MITE,
+#endif
+#if TAG_MAJOR_VERSION > 34
+    MONS_CLOCKROACH,
 #endif
     MONS_SPIDER,
     MONS_WOLF_SPIDER,
@@ -283,6 +286,9 @@ enum monster_type                      // env.mons[].type
     MONS_DEMONIC_CRAWLER,
     MONS_SNAPPING_TURTLE,
     MONS_ALLIGATOR_SNAPPING_TURTLE,
+#if TAG_MAJOR_VERSION > 34
+    MONS_MOUNTAINSHELL,
+#endif
 #if TAG_MAJOR_VERSION == 34
     MONS_GNOME,
 #endif
@@ -330,6 +336,7 @@ enum monster_type                      // env.mons[].type
     MONS_SPELLSPARK_SERVITOR,
     MONS_USHABTI,
     MONS_NARGUN,
+    MONS_UNDERTAKER,
     MONS_PLATINUM_PARAGON,
     MONS_WALKING_ALEMBIC,
     MONS_SOLAR_EMBER,
@@ -418,6 +425,7 @@ enum monster_type                      // env.mons[].type
     MONS_KOBOLD_BRIGAND,
     MONS_KOBOLD_DEMONOLOGIST,
 #if TAG_MAJOR_VERSION > 34
+    MONS_KOBOLD_GEOMANCER,
     MONS_KOBOLD_BLASTMINER,
     MONS_KOBOLD_FLESHCRAFTER,
 #endif
@@ -643,6 +651,10 @@ enum monster_type                      // env.mons[].type
 #if TAG_MAJOR_VERSION > 34
     MONS_SALAMANDER_MYSTIC,
     MONS_SALAMANDER_TYRANT,
+
+    // Rock fish:
+    MONS_ROCK_FISH,
+
 #endif
 
     // Water monsters:
@@ -812,6 +824,9 @@ enum monster_type                      // env.mons[].type
 #endif
     MONS_GHOST,                 // common genus for monster and player ghosts
     MONS_PHANTOM,
+#if TAG_MAJOR_VERSION > 34
+    MONS_BES_KEMWAR,
+#endif
     MONS_SHADOWGHAST,
 #if TAG_MAJOR_VERSION == 34
     MONS_HUNGRY_GHOST,
@@ -914,7 +929,9 @@ enum monster_type                      // env.mons[].type
     MONS_TERENCE,
     MONS_BLORKULA_THE_ORCULA,
     MONS_EDMUND,
+#if TAG_MAJOR_VERSION == 34
     MONS_PSYCHE,
+#endif
     MONS_EROLCHA,
     MONS_DONALD,
     MONS_URUG,
@@ -999,6 +1016,7 @@ enum monster_type                      // env.mons[].type
     MONS_XAKKRIXIS,
     MONS_NAMELESS_REVENANT,  // 'Nobody' (except with a less misleading enum name)
     MONS_SPROZZ,
+    MONS_CASSANDRA,
 #endif
     // Sprint uniques:
     MONS_CHUCK,
@@ -1318,9 +1336,7 @@ enum monster_type                      // env.mons[].type
     MONS_PILE_OF_DEBRIS,
     MONS_PILLAR_OF_RIME,
     MONS_HOARFROST_CANNON,
-#if TAG_MAJOR_VERSION == 34
-    MONS_ELECTROFERRIC_VORTEX,
-#endif
+    MONS_ELECTROFERRIC_VORTEX,  // removed
     MONS_POLTERGUARDIAN,
     MONS_MARROWCUDA,
     MONS_UNDYING_ARMOURY,
@@ -1372,6 +1388,13 @@ enum monster_type                      // env.mons[].type
     MONS_ORB_OF_WINTER,
     MONS_SCREAMING_REFRACTION,
     MONS_SHOOTING_STAR,
+    MONS_CASSANDRA,
+    MONS_BES_KEMWAR,
+    MONS_ROCK_FISH,
+    MONS_CLOCKROACH,
+    MONS_KOBOLD_GEOMANCER,
+    MONS_MOUNTAINSHELL,
+    MONS_UNDERTAKER,
 #endif
 
     NUM_MONSTERS,               // used for polymorph

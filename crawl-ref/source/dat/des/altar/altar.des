@@ -205,7 +205,7 @@ xxx...@..xxxx
 ENDMAP
 
 NAME:    lemuel_angel_altar
-TAGS:    no_trap_gen no_descent vaults_empty no_wall_fixup
+TAGS:    no_trap_gen no_descent vaults_empty no_wall_fixup extra
 DEPTH:   Vaults, !Vaults:$, Depths
 WEIGHT:  3 (Vaults), 10
 MONS:    patrolling Angel, patrolling Daeva
@@ -407,7 +407,7 @@ COLOUR:   x : blue / red / magenta / brown / lightgreen / lightred / \
 NSUBST:   u = 1=p / 1=r / 1=q / 2=q...
 FTILE:    'upqrzc : floor_nerves
 MARKER:   r = lua:fog_machine { cloud_type="purple smoke", walk_dist=1, \
-            size=1, pow_max=5, delay=10, buildup_amnt=7, buildup_time=7, \
+            size = 1, pow_max=5, delay=10, buildup_amnt=7, buildup_time=7, \
             spread_rate=2, start_clouds=1, colour="purple" }
 TILE:     x : wall_abyss
 MAP

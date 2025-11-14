@@ -70,6 +70,7 @@
 #include "shout.h"
 #include "skills.h"
 #include "species.h" // random_starting_species
+#include "spl-book.h"
 #include "spl-clouds.h" // explode_blastmotes_at
 #include "spl-damage.h"
 #include "spl-monench.h"
@@ -323,7 +324,7 @@ bool check_moveto_terrain(const coord_def& p, const string &move_verb,
 
         prompt += "Are you sure you want to " + move_verb;
 
-        if (you.ground_level())
+        if (!you.airborne())
             prompt += " into ";
         else
             prompt += " over ";
@@ -594,7 +595,7 @@ void moveto_location_effects(dungeon_feature_type old_feat,
     if (you.has_innate_mutation(MUT_MERTAIL))
         merfolk_check_swimming(old_feat, stepped);
 
-    if (you.ground_level())
+    if (!you.airborne())
     {
         if (feat_is_water(new_grid))
             _enter_water(old_feat, new_grid, stepped);
@@ -1025,6 +1026,26 @@ bool player::unrand_equipped(int unrand_index, bool include_melded) const
         return you.equipment.unrand_equipped.get(unrand_index - UNRAND_START);
     else
         return you.equipment.unrand_active.get(unrand_index - UNRAND_START);
+}
+
+bool player::weapon_is_good_stab(const item_def *weapon) const
+{
+    const skill_type wpn_skill = weapon ? item_attack_skill(*weapon)
+                                        : SK_UNARMED_COMBAT;
+
+    return wpn_skill == SK_SHORT_BLADES
+           || you.get_mutation_level(MUT_PAWS)
+           || you.form == transformation::spider
+           || you.unrand_equipped(UNRAND_HOOD_ASSASSIN)
+              && (!weapon || is_melee_weapon(*weapon));
+}
+
+bool player::has_good_stab() const
+{
+    const item_def *weapon = you.weapon();
+    const item_def *offhand = you.offhand_weapon();
+
+    return you.weapon_is_good_stab(weapon) || you.weapon_is_good_stab(offhand);
 }
 
 bool player_can_hear(const coord_def& p, int hear_distance)
@@ -1563,7 +1584,7 @@ int player_spec_fire()
     sf += you.scan_artefacts(ARTP_ENHANCE_FIRE);
 
     if (you.unrand_equipped(UNRAND_ELEMENTAL_STAFF))
-        sf++;
+        sf += 1 + you.wearing_ego(OBJ_ARMOUR, SPARM_ATTUNEMENT);
 
     return sf;
 }
@@ -1580,7 +1601,7 @@ int player_spec_cold()
     sc += you.scan_artefacts(ARTP_ENHANCE_ICE);
 
     if (you.unrand_equipped(UNRAND_ELEMENTAL_STAFF))
-        sc++;
+        sc += 1 + you.wearing_ego(OBJ_ARMOUR, SPARM_ATTUNEMENT);
 
     return sc;
 }
@@ -1598,7 +1619,7 @@ int player_spec_earth()
     se += you.scan_artefacts(ARTP_ENHANCE_EARTH);
 
     if (you.unrand_equipped(UNRAND_ELEMENTAL_STAFF))
-        se++;
+        se += 1 + you.wearing_ego(OBJ_ARMOUR, SPARM_ATTUNEMENT);;
 
     return se;
 }
@@ -1616,7 +1637,7 @@ int player_spec_air()
     sa += you.scan_artefacts(ARTP_ENHANCE_AIR);
 
     if (you.unrand_equipped(UNRAND_ELEMENTAL_STAFF))
-        sa++;
+        sa += 1 + you.wearing_ego(OBJ_ARMOUR, SPARM_ATTUNEMENT);
 
     return sa;
 }
@@ -1666,7 +1687,7 @@ int player_spec_alchemy()
     sp += you.scan_artefacts(ARTP_ENHANCE_ALCHEMY);
 
     if (you.unrand_equipped(UNRAND_OLGREB))
-        sp++;
+        sp += 1 + you.wearing_ego(OBJ_ARMOUR, SPARM_ATTUNEMENT);;
 
     return sp;
 }
@@ -1995,9 +2016,6 @@ static int _player_temporary_evasion_modifiers()
 // Player EV multipliers for transient effects
 static int _player_apply_evasion_multipliers(int prescaled_ev, const int scale)
 {
-    if (you.form == transformation::statue)
-        prescaled_ev = prescaled_ev * 4 / 5;
-
     if (you.duration[DUR_PETRIFYING] || you.caught())
         prescaled_ev /= 2;
 
@@ -2060,13 +2078,16 @@ static int _player_evasion(int final_scale, bool ignore_temporary)
     const int size_base_ev = (10 + size_factor) * scale;
 
     // Calculate 'base' evasion from all permanent modifiers
-    const int natural_evasion =
+    int natural_evasion =
         size_base_ev
         + _player_armour_adjusted_dodge_bonus(scale)
         - you.adjusted_body_armour_penalty(scale)
         - you.adjusted_shield_penalty(scale)
         - _player_aux_evasion_penalty(scale)
         + _player_base_evasion_modifiers() * scale;
+
+    if (you.form == transformation::statue)
+        natural_evasion = natural_evasion * 4 / 5;
 
     // Everything below this are transient modifiers
     if (ignore_temporary)
@@ -2107,6 +2128,16 @@ int player_armour_shield_spell_penalty()
     return max(total_penalty, 0) / scale;
 }
 
+int player_armour_stealth_penalty()
+{
+    const item_def *body_armour = you.body_armour();
+
+    if (body_armour && body_armour->sub_type == ARM_SHADOW_DRAGON_ARMOUR)
+        return 0;
+
+    return you.unadjusted_body_armour_penalty();
+}
+
 /**
  * How many spell-success-boosting ('wizardry') effects does the player have?
  *
@@ -2121,7 +2152,7 @@ int player_wizardry()
 
 int player_channelling_chance(bool max)
 {
-    if (you.has_mutation(MUT_HP_CASTING) || !you.wearing_ego(OBJ_ARMOUR, SPARM_ENERGY))
+    if (you.has_mutation(MUT_HP_CASTING))
         return 0;
 
     const int skill = max ? 27 : you.skill(SK_EVOCATIONS);
@@ -2157,11 +2188,8 @@ int player_shield_class(int scale, bool random, bool ignore_temporary)
 {
     int shield = 0;
 
-    if (!ignore_temporary
-        && you.incapacitated() || you.has_bane(BANE_RECKLESS))
-    {
+    if (!ignore_temporary && you.incapacitated())
         return 0;
-    }
 
     const item_def *shield_item = you.shield();
     if (is_shield(shield_item))
@@ -2193,8 +2221,11 @@ int player_shield_class(int scale, bool random, bool ignore_temporary)
     shield += you.wearing_jewellery(AMU_REFLECTION) * AMU_REFLECT_SH * 100;
     shield += you.scan_artefacts(ARTP_SHIELDING) * 200;
 
-    if (you.duration[DUR_PARRYING])
+    if (!ignore_temporary && you.duration[DUR_PARRYING])
         shield += player_parrying() * 200;
+
+    if (you.has_mutation(MUT_RECKLESS))
+        shield /= 2;
 
     return random ? div_rand_round(shield * scale, 100) : ((shield * scale) / 100);
 }
@@ -2223,6 +2254,21 @@ int player_displayed_shield_class(int scale, bool ignore_temporary)
 bool player_omnireflects()
 {
     return you.unrand_equipped(UNRAND_WARLOCK_MIRROR);
+}
+
+int player::temp_ac_mod() const
+{
+    return armour_class_scaled(100) - base_ac(100);
+}
+
+int player::temp_ev_mod() const
+{
+    return evasion_scaled(100) - evasion_scaled(100, true);
+}
+
+int player::temp_sh_mod() const
+{
+    return player_shield_class(1, false, false) - player_shield_class(1, false, true);
 }
 
 void forget_map(bool rot)
@@ -2477,7 +2523,7 @@ static void _handle_banes(int exp)
 
     if (you.attribute[ATTR_DOOM] > 0)
     {
-        you.attribute[ATTR_DOOM] -= div_rand_round(loss, 15);
+        you.attribute[ATTR_DOOM] -= div_rand_round(loss, 60);
         if (you.attribute[ATTR_DOOM] <= 0)
         {
             mprf(MSGCH_DURATION, "You feel the doom around you dissipate.");
@@ -2821,6 +2867,7 @@ static void _revenant_spell_gift()
 
     mprf("You remember %s.", msg.c_str());
     mprf("(You can now cast %s.)", spell_title(spell));
+    library_add_spells({spell}, true);
     add_spell_to_memory(spell);
 }
 
@@ -3066,7 +3113,7 @@ void level_change(bool skip_attribute_increase)
                         mpr("You feel a burst of inspiration! You are finally "
                             "ready to make a one-of-a-kind gizmo!");
                         mprf("(press <w>%c</w> on the <w>%s</w>bility menu to create your gizmo)",
-                                get_talent(ABIL_INVENT_GIZMO, false).hotkey,
+                                get_talent(ABIL_INVENT_GIZMO).hotkey,
                                 command_to_string(CMD_USE_ABILITY).c_str());
                     }
                     break;
@@ -3208,7 +3255,7 @@ int player_stealth()
     {
         // [ds] New stealth penalty formula from rob: SP = 6 * (EP^2)
         // Now 2 * EP^2 / 3 after EP rescaling.
-        const int evp = you.unadjusted_body_armour_penalty();
+        const int evp = player_armour_stealth_penalty();
         const int penalty = evp * evp * 2 / 3;
         stealth -= penalty;
 
@@ -3235,15 +3282,6 @@ int player_stealth()
     {
         stealth += (STEALTH_PIP * 2);
     }
-
-    // Radiating silence is the negative complement of shouting all the
-    // time... a sudden change from background noise to no noise is going
-    // to clue anything in to the fact that something is very wrong...
-    // a personal silence spell would naturally be different, but this
-    // silence radiates for a distance and prevents monster spellcasting,
-    // which pretty much gives away the stealth game.
-    if (you.duration[DUR_SILENCE])
-        stealth -= STEALTH_PIP;
 
     if (feat_is_water(env.grid(you.pos())))
     {
@@ -3646,7 +3684,7 @@ int slaying_bonus(bool throwing, bool random)
         ret += you.props[WU_JIAN_HEAVENLY_STORM_KEY].get_int();
 
     if (you.has_bane(BANE_CLAUSTROPHOBIA))
-        ret += you.props[CLAUSTROPHOBIA_KEY].get_int();
+        ret -= you.props[CLAUSTROPHOBIA_KEY].get_int();
 
     ret += get_form()->slay_bonus(random);
 
@@ -3802,15 +3840,7 @@ void pay_mp(int cost)
     if (you.has_mutation(MUT_HP_CASTING))
         pay_hp(cost);
     else
-    {
         _dec_mp(cost, true);
-
-        if (!you.duration[DUR_STARDUST_COOLDOWN]
-            && you.wearing_ego(OBJ_ARMOUR, SPARM_STARDUST))
-        {
-            stardust_fineff::schedule(&you, cost, 10 + you.skill(SK_EVOCATIONS, 10));
-        }
-    }
 }
 
 void refund_hp(int cost)
@@ -4233,9 +4263,7 @@ void contaminate_player(int change, bool controlled, bool msg)
     }
     else if (msg && new_level < old_level)
     {
-        if (old_amount > 1 && you.magic_contamination == 0)
-            mpr("Your magical contamination has completely faded away.");
-        else if (!player_harmful_contamination() && was_glowing)
+        if (!player_harmful_contamination() && was_glowing)
         {
             mprf(MSGCH_RECOVERY,
                  "Your magical contamination has faded to a safe level.");
@@ -4247,6 +4275,9 @@ void contaminate_player(int change, bool controlled, bool msg)
                 "glowing from magical contamination.");
         }
     }
+
+    if (msg && old_amount > 0 && you.magic_contamination == 0)
+        mpr("Your magical contamination has completely faded away.");
 
     if (you.magic_contamination > 0)
         learned_something_new(HINT_GLOWING);
@@ -4715,7 +4746,8 @@ void dec_sticky_flame_player(int delay)
     ouch(damage, KILLED_BY_BURNING);
 
     you.duration[DUR_STICKY_FLAME] =
-        max(0, you.duration[DUR_STICKY_FLAME] - delay);
+        max(0, you.duration[DUR_STICKY_FLAME]
+                    - (delay * (1 + you.wearing_jewellery(AMU_DISSIPATION))));
 
     if (you.duration[DUR_STICKY_FLAME == 0])
     {
@@ -4812,6 +4844,8 @@ void dec_slow_player(int delay)
 {
     if (!you.duration[DUR_SLOW])
         return;
+
+    delay = delay * (1 + you.wearing_jewellery(AMU_DISSIPATION));
 
     if (you.duration[DUR_SLOW] > BASELINE_DELAY)
     {
@@ -5059,7 +5093,7 @@ void reset_rampage_heal_duration()
     you.set_duration(DUR_RAMPAGE_HEAL, heal_dur);
 }
 
-void apply_rampage_heal()
+void apply_rampage_heal(int distance_moved)
 {
     if (!you.has_mutation(MUT_ROLLPAGE))
         return;
@@ -5067,8 +5101,7 @@ void apply_rampage_heal()
     reset_rampage_heal_duration();
 
     const int heal = you.props[RAMPAGE_HEAL_KEY].get_int();
-    if (heal < RAMPAGE_HEAL_MAX)
-        you.props[RAMPAGE_HEAL_KEY] = heal + 1;
+    you.props[RAMPAGE_HEAL_KEY] = min(RAMPAGE_HEAL_MAX, heal + distance_moved);
 }
 
 bool invis_allowed(bool quiet, string *fail_reason, bool temp)
@@ -5361,7 +5394,7 @@ player::player()
     for (auto &item : inv)
         item.clear();
     runes.reset();
-    obtainable_runes = 15;
+    obtainable_runes = MAX_RUNES;
 
     gems_found.reset();
     gems_shattered.reset();
@@ -5692,12 +5725,26 @@ bool player::airborne() const
         || get_form()->enables_flight();
 }
 
-bool player::rampaging() const
+int player::rampaging() const
 {
-    return you.unrand_equipped(UNRAND_SEVEN_LEAGUE_BOOTS)
-            || you.has_mutation(MUT_ROLLPAGE)
-            || you.form == transformation::spider
-            || actor::rampaging();
+    int rampage = 0;
+    rampage += actor::rampaging();
+
+    if (you.has_mutation(MUT_ROLLPAGE))
+        rampage++;
+
+    if (you.form == transformation::spider)
+        rampage++;
+
+    if (you.duration[DUR_EXECUTION])
+        rampage++;
+
+    rampage = min(3, rampage);
+
+    if (you.unrand_equipped(UNRAND_SEVEN_LEAGUE_BOOTS))
+        rampage = get_los_radius();
+
+    return rampage;
 }
 
 bool player::is_banished() const
@@ -5729,7 +5776,7 @@ bool player::is_sufficiently_rested(bool starting) const
 
 bool player::in_water() const
 {
-    return ground_level() && !you.can_water_walk() && feat_is_water(env.grid(pos()));
+    return !airborne() && !you.can_water_walk() && feat_is_water(env.grid(pos()));
 }
 
 bool player::in_liquid() const
@@ -5934,7 +5981,7 @@ bool player::liquefied_ground() const
 {
     return liquefied(pos())
            && you.species != SP_GREY_DRACONIAN
-           && ground_level() && !is_insubstantial();
+           && !airborne() && !is_insubstantial();
 }
 
 /**
@@ -6109,7 +6156,7 @@ int player::skill(skill_type sk, int scale, bool real, bool temp) const
 
     if (temp && skill_has_dilettante_penalty(sk))
     {
-        if (sk <= SK_LAST_WEAPON)
+        if (sk <= SK_LAST_WEAPON || sk ==  SK_UNARMED_COMBAT)
             level = level / 2;
         else
             level = level * 3 / 4;
@@ -6171,12 +6218,12 @@ int stone_body_armour_bonus()
  * @param armour    The armour in question.
  * @param scale     A value to multiply the result by. (Used to avoid integer
  *                  rounding.)
- * @param include_penalties     Whether to include penalties to base AC from
- *                              forms or mutations.
+ * @param include_form    Whether to include modifiers to base AC from the
+ *                        player's current form.
  * @return          The AC from that armour, including armour skill, mutations
  *                  & divine blessings, but not enchantments or egos.
  */
-int player::base_ac_from(const item_def &armour, int scale, bool include_penalties) const
+int player::base_ac_from(const item_def &armour, int scale, bool include_form) const
 {
     const int base = property(armour, PARM_AC) * scale;
 
@@ -6184,12 +6231,12 @@ int player::base_ac_from(const item_def &armour, int scale, bool include_penalti
     const int AC = base * (440 + skill(SK_ARMOUR, 20)) / 440;
 
     // Only body armour can have additional penalties from mutations or forms.
-    if (get_armour_slot(armour) != SLOT_BODY_ARMOUR || !include_penalties)
+    if (get_armour_slot(armour) != SLOT_BODY_ARMOUR)
         return AC;
 
-    int mult = get_form()->get_body_ac_mult();
+    int mult = include_form ? get_form()->get_body_ac_mult() : 0;
     if (get_mutation_level(MUT_DEFORMED) || get_mutation_level(MUT_PSEUDOPODS))
-        mult -= 40; // Should we double this if you have both?
+        mult = ((mult + 100) * 6 / 10) - 100; // Should we double this if you have both?
     const int mod = AC * mult / 100;
 
     return max(0, AC + mod);
@@ -6433,10 +6480,23 @@ int player::armour_class_scaled(int scale) const
 void player::refresh_rampage_hints()
 {
     rampage_hints.clear();
-    if (you.rampaging())
-        for (coord_def delta : Compass)
-            if ((delta.x || delta.y) && get_rampage_target(delta))
-                you.rampage_hints.insert(you.pos() + delta);
+    const int rampage = you.rampaging();
+    if (!rampage)
+        return;
+
+    for (coord_def delta : Compass)
+    {
+        if (!(delta.x || delta.y))
+            continue;
+
+        const monster* target = get_rampage_target(delta);
+        if (!target)
+            continue;
+
+        const int dist = min(rampage, (target->pos() - you.pos()).rdist() - 1);
+        for (int i = 1; i <= dist; ++i)
+            you.rampage_hints.insert(you.pos() + delta * i);
+    }
 }
 
  /**
@@ -8309,6 +8369,16 @@ void player::weaken(const actor */*attacker*/, int pow)
     increase_duration(DUR_WEAK, pow + random2(pow + 3), 50);
 }
 
+void player::diminish(const actor */*attacker*/, int pow)
+{
+    if (!duration[DUR_DIMINISHED_SPELLS])
+        mprf(MSGCH_WARN, "You feel your spells grow feeble.");
+    else
+        mprf(MSGCH_WARN, "You feel as though your spells will be weakened yet longer.");
+
+    increase_duration(DUR_DIMINISHED_SPELLS, pow + random2(pow + 3), 50);
+}
+
 bool player::strip_willpower(actor */*attacker*/, int dur, bool quiet)
 {
     // Only prints a message when you gain this status for the first time,
@@ -9153,8 +9223,11 @@ void trickster_trigger(const monster& victim, enchant_type ench)
     if (!_ench_triggers_trickster(ench))
         return;
 
-    if (!you.can_see(victim) || !you.see_cell_no_trans(victim.pos()) || victim.friendly())
+    if (!you.can_see(victim) || !you.see_cell_no_trans(victim.pos())
+        || victim.friendly() || victim.is_firewood())
+    {
         return;
+    }
 
     const int min_bonus = 3 + you.experience_level / 6;
 

@@ -235,6 +235,7 @@ typedef FixedArray< coloured_feature, GXM, GYM > dungeon_colour_grid;
 static unique_ptr<dungeon_colour_grid> dgn_colour_grid;
 
 static string branch_epilogues[NUM_BRANCHES];
+FixedVector<string_set, NUM_BRANCHES> branch_uniq_map_tags;
 
 set<string> &get_uniq_map_tags()
 {
@@ -458,6 +459,8 @@ static bool _build_level_vetoable(bool enable_random_maps)
     mapstat_report_map_build_start();
 #endif
 
+    // Copy uniq tags for previous floors in this branch
+    env.branch_uniq_map_tags = branch_uniq_map_tags[you.where_are_you];
     dgn_reset_level(enable_random_maps);
 
     if (player_in_branch(BRANCH_TEMPLE))
@@ -514,6 +517,9 @@ static bool _build_level_vetoable(bool enable_random_maps)
     env.level_layout_types.clear();
     env.level_uniq_maps.clear();
     env.level_uniq_map_tags.clear();
+    // Copy final tags set back over to the branch list
+    branch_uniq_map_tags[you.where_are_you] = env.branch_uniq_map_tags;
+
     _dgn_map_colour_fixup();
 
     // Call the branch epilogue, if any.
@@ -741,12 +747,14 @@ player to a level or regenerates a level.
 */
 void dgn_reset_player_data()
 {
-
     // vaults and map stuff
     you.uniq_map_tags.clear();
     you.uniq_map_names.clear();
     you.uniq_map_tags_abyss.clear();
     you.uniq_map_names_abyss.clear();
+    for (auto branch : branch_uniq_map_tags)
+        branch.clear();
+
     you.vault_list.clear();
     you.branches_left.reset();
     you.zigs_completed = 0;
@@ -770,7 +778,7 @@ void dgn_reset_player_data()
 
     // item stuff that can interact with the builder
     you.runes.reset();
-    you.obtainable_runes = 15;
+    you.obtainable_runes = MAX_RUNES;
     initialise_item_sets(true);
     you.unique_items.init(UNIQ_NOT_EXISTS);
     you.octopus_king_rings = 0x00;
@@ -854,6 +862,8 @@ static void _dgn_register_vault(const string &name, const unordered_set<string> 
             get_uniq_map_tags().insert(tag);
         else if (starts_with(tag, "luniq_"))
             env.level_uniq_map_tags.insert(tag);
+        else if (starts_with(tag, "buniq_"))
+            env.branch_uniq_map_tags.insert(tag);
     }
 }
 
@@ -878,6 +888,8 @@ static void _dgn_unregister_vault(const map_def &map)
             get_uniq_map_tags().erase(tag);
         else if (starts_with(tag, "luniq_"))
             env.level_uniq_map_tags.erase(tag);
+        else if (starts_with(tag, "buniq_"))
+            env.branch_uniq_map_tags.erase(tag);
     }
 
     for (const subvault_place &sub : map.subvault_places)
@@ -1702,17 +1714,6 @@ static void _fixup_walls()
         wall_type = DNGN_METAL_WALL;
         break;
 
-    case BRANCH_VAULTS:
-    {
-        // Everything but the branch end is handled in Lua.
-        if (you.depth == branches[BRANCH_VAULTS].numlevels)
-        {
-            wall_type = random_choose_weighted(1, DNGN_CRYSTAL_WALL,
-                                               9, DNGN_METAL_WALL);
-        }
-        break;
-    }
-
     case BRANCH_CRYPT:
         wall_type = DNGN_STONE_WALL;
         break;
@@ -2443,7 +2444,7 @@ static void _build_overflow_temples()
                 }
 
                 if (num_gods == 1
-                    && get_uniq_map_tags().find("uniq_altar_" + name)
+                    && get_uniq_map_tags().find("buniq_altar_" + name)
                        != get_uniq_map_tags().end())
                 {
                     // We've already placed a specialized temple for this
@@ -2612,6 +2613,7 @@ static void _ruin_level(Iterator iter,
                 // isolated transparent or rtele_into square.
                 env.level_map_mask(p) |= cfeat.mask;
                 env.pgrid(p) |= cfeat.prop;
+                tile_clear_flavour(p);
                 _set_grd(p, replacement);
             }
 
@@ -2773,6 +2775,9 @@ static void _build_dungeon_level()
 
         _place_traps();
 
+        if (!dgn_make_transporters_from_markers())
+            throw dgn_veto_exception("Transporter placement failed.");
+
         // Any vault-placement activity must happen before this check.
         _dgn_verify_connectivity(nvaults);
 
@@ -2788,6 +2793,9 @@ static void _build_dungeon_level()
         // Do ruination and plant clumps even in funny game modes, if
         // they happen to have the relevant branch.
         _post_vault_build();
+
+        if (!dgn_make_transporters_from_markers())
+            throw dgn_veto_exception("Transporter placement failed.");
     }
 
     // Translate stairs for pandemonium levels.
@@ -2795,9 +2803,6 @@ static void _build_dungeon_level()
         _fixup_pandemonium_stairs();
 
     _fixup_branch_stairs();
-
-    if (!dgn_make_transporters_from_markers())
-        throw dgn_veto_exception("Transporter placement failed.");
 
     fixup_misplaced_items();
     link_items();
@@ -5403,6 +5408,8 @@ monster* dgn_place_monster(mons_spec &mspec, coord_def where,
     for (const mon_enchant &ench : mspec.ench)
         mons->add_ench(ench);
 
+    mons->origin_level = level_id::current();
+
     return mons;
 }
 
@@ -5720,6 +5727,7 @@ void dgn_replace_area(const coord_def& p1, const coord_def& p2,
                 env.map_knowledge(*ri).set_feature(feature, 0,
                                                    get_trap_type(*ri));
 #ifdef USE_TILE
+                // XXX: this will not be the correct tile for the feature...
                 tile_env.bk_bg(*ri) = feature;
 #endif
             }
@@ -6497,7 +6505,8 @@ static void _place_specific_trap(const coord_def& where, trap_spec* spec,
 
     if (spec_type == TRAP_SHAFT && !is_valid_shaft_level())
     {
-        mprf(MSGCH_ERROR, "Vault %s tried to place a shaft at a branch end",
+        mprf(MSGCH_ERROR, "%s%s tried to place a shaft at a branch end.",
+                env.placing_vault.empty() ? "Something" : "Vault ",
                 env.placing_vault.c_str());
     }
 

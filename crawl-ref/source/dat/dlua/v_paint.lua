@@ -229,7 +229,7 @@ local function inside_oval(x,y,item)
   local h = (item.corner2.x + item.corner1.x)/2
   local k = (item.corner2.y + item.corner1.y)/2
   -- Test
-  return ((math.pow(x-h,2)/math.pow(rx,2) + math.pow(y-k,2)/math.pow(ry,2))<=1)
+  return (x - h) ^ 2 / rx ^ 2 + (y - k) ^ 2 / ry ^ 2 <= 1
 end
 
 local function inside_trapese(x,y,item)
@@ -296,7 +296,7 @@ function paint_grid(paint, options, grid)
 
 end
 
-function paint_vaults_layout(paint, options, layout_grid)
+function paint_vaults_layout(e, paint, options, layout_grid)
 
   -- Default options
   if options == nil then options = vaults_default_options() end
@@ -307,6 +307,9 @@ function paint_vaults_layout(paint, options, layout_grid)
   if options.layout_wall_weights ~= nil then
     local chosen = util.random_weighted_from("weight", options.layout_wall_weights)
     wall_type = chosen.feature
+    if chosen.feature == "crystal_wall" then
+      e.lfloortile("floor_crystal")
+    end
   end
   -- Store it in options so it can be used for room surrounds also
   options.layout_wall_type = wall_type

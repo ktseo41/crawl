@@ -57,15 +57,16 @@ The contents of this text are:
                 auto_switch, easy_unequip, equip_unequip, jewellery_prompt,
                 easy_confirm, simple_targeting, force_spell_targeter,
                 force_ability_targeter, allow_self_target, ability_menu,
-                spell_menu, easy_floor_use, sort_menus, spell_slot, item_slot,
-                ability_slot, autofight_stop, autofight_warning,
-                autofight_fires, autofight_nomove_fires, autofight_fire_stop,
-                autofight_caught, autofight_wait, autofight_prompt_range,
-                automagic_enable, automagic_slot, automagic_fight,
-                automagic_stop, fail_severity_to_confirm, easy_door,
-                warn_hatches, enable_recast_spell, confirm_action,
+                spell_menu, easy_floor_use, sort_menus, spell_slot, gear_slot,
+                consumable_shortcut, ability_slot, autofight_stop,
+                autofight_warning, autofight_fires, autofight_nomove_fires,
+                autofight_fire_stop, autofight_caught, autofight_wait,
+                autofight_prompt_range, automagic_enable, automagic_slot,
+                automagic_fight, automagic_stop, fail_severity_to_confirm,
+                easy_door, warn_hatches, enable_recast_spell, confirm_action,
                 regex_search, autopickup_search, bad_item_prompt,
-                auto_hide_spells, menu_arrow_control, single_column_item_menus
+                auto_hide_spells, menu_arrow_control, single_column_item_menus,
+                show_paged_inventory
 3-h     Message and Display Enhancements.
                 hp_warning, mp_warning, hp_colour, mp_colour, stat_colour,
                 status_caption_colour, enemy_hp_colour, clear_messages,
@@ -84,7 +85,7 @@ The contents of this text are:
                 action_panel_filter, action_panel_show_unidentified,
                 action_panel_scale, action_panel_orientation,
                 action_panel_font_family, action_panel_font_size,
-		 show_resist_percent
+                show_resist_percent
 3-i     Colours (messages and menus).
                 menu_colour, message_colour
 3-j     Quivers, firing, and ammo.
@@ -391,9 +392,9 @@ weapon += (short sword |...| unarmed | random | viable), <weapon>, ...
         game to randomly select a weapon from the given list. The combo option
         overrides (and is overridden by) this option.
 
-species += (Human |...| Vampire | random | viable), <species>, ...
+species += (Human |...| Revenant | random | viable), <species>, ...
         (List option)
-        The usual abbreviations (Hu, HO, etc.) work. "viable" will choose a
+        The usual abbreviations (Hu, MD, etc.) work. "viable" will choose a
         viable species for a given background if the background is chosen
         first. Specifying multiple species causes one to be selected at
         random from the given species. The combo option overrides (and is
@@ -401,7 +402,7 @@ species += (Human |...| Vampire | random | viable), <species>, ...
 
 background += (Fighter |...| Wanderer | random | viable), <background>, ...
         (List option)
-        Here again the abbreviations (Fi, HW, AK, etc.) can be used. The same
+        Here again the abbreviations (Fi, HW, CA, etc.) can be used. The same
         caveat applies to "viable": it is only really meaningful if the
         species option is also set. Specifying multiple backgrounds causes
         one to be selected at random from the given species. The combo option
@@ -591,6 +592,7 @@ autopickup = $?!+"/♦
         }       Misc. items
         $       Gold
         ♦       Gems
+        •       Baubles
         Note that _whether_ items are picked up automatically or not, is
         controlled by the in-game toggle Ctrl-A. Also note that picking
         up takes a turn, but only one turn (regardless of the number of
@@ -1109,18 +1111,18 @@ explore_auto_rest_status = <status name>, <cooldown name>, <duration name>...
         duration-based statuses by either the name of their status light or
         the phrasing that appears on the % screen.
 
-	There are several special values:
-		"all_negative" = all time-based negative statuses (eg: Slow)
-               "all_cooldown" = all time-based cooldowns (eg: -Blink)
-               "contam"       = any amount of magic contamination
-		"transformation" = any time-based negative form (ie: pig/wisp).
+        There are several special values:
+            "all_negative"   = all time-based negative statuses (eg: Slow)
+            "all_cooldown"   = all time-based cooldowns (eg: -Blink)
+            "contam"         = any amount of magic contamination
+            "transformation" = any time-based negative form (ie: pig/wisp).
 
-	To exclude a specific status from all_negative or all_cooldown, include
+        To exclude a specific status from all_negative or all_cooldown, include
         the status with an * at the start. For instance:
-		explore_auto_rest_status += *-blink
-	will remove -blink from the list of cooldowns it wants to wait on.
+            explore_auto_rest_status += *-blink
+        will remove -blink from the list of cooldowns it wants to wait on.
 
-	Defaults to "all_negative", "all_cooldown", "contam"
+        Defaults to "all_negative", "all_cooldown", "contam".
 
 auto_exclude += <monster name>, <monster name>, ...
         (List option)
@@ -1153,7 +1155,7 @@ auto_switch = false
 easy_unequip = true
         Allows auto removal of armour and jewellery when dropping it.
 
-equip_unequip = false
+equip_unequip = true
         If this is true, selecting an already-equipped piece of equipment via
         the 'w', 'W' or 'P' menus (for weapons, armour or jewellery
         respectively) will unequip that item.
@@ -1197,9 +1199,9 @@ force_spell_targeter = hailstorm, starburst, frozen ramparts, ignition,
         be shown with every spell.
 
 force_ability_targeter = sanctuary, cleansing flame, word of chaos, recite,
-                         elemental force, oozemancy, galvanic breath, 
+                         elemental force, oozemancy, galvanic breath,
                          fathomless shackles, slouch, disaster area, apocalypse,
-                         corrupt, foxfire swarm, siphon essence, shadowslip, 
+                         corrupt, foxfire swarm, siphon essence, shadowslip,
                          watery grave
         Force showing a targeter for the listed abilities when activating them
         normally, even if the ability isn't targeted. This for practical
@@ -1330,12 +1332,12 @@ sort_menus = [menu:](true | false | auto:X)[:sort_order]
           Makes evokers with available charges appear before those which
           are empty; irrelevant for all other item types.
 
-	* usefulness:
-	  Sorts consumables by their current 'usefulness' in the
+        * usefulness:
+          Sorts consumables by their current 'usefulness' in the
           following order: Emergency (eg: ?blinking, !heal wounds),
-	  Good (eg: ?acquirement), Normal, Dangerous (eg: !lignification),
-	  Bad (eg: ?torment while worshipping a good god), and finally
-	  permanently useless.
+          Good (eg: ?acquirement), Normal, Dangerous (eg: !lignification),
+          Bad (eg: ?torment while worshipping a good god), and finally
+          permanently useless.
 
         You can ask for a descending order sort by prefixing one or more
         sort criteria with > as:
@@ -1406,16 +1408,16 @@ gear_slot ^= <regex>:<inventory letters>
         list of letters.
 
 consumable_shortcut += <item name>:<inventory letter>
-	(Ordered list option, one value per line)
-	Similar to gear_slot, but accepts only a single letter per consumable
+        (Ordered list option, one value per line)
+        Similar to gear_slot, but accepts only a single letter per consumable
         name and does not handle regex.
 
-	The game will try very hard to automatically assign a consumable to
-	any letter given a mapping by this option, unless it is an identified
-	item of a different category. (eg: 'potion of curing:c' will result
-	in no other potion ever being auto-assigned to 'c' and unidentified
-	scrolls also avoiding it where possible, since they share the ?id menu
-	together.)
+        The game will try very hard to automatically assign a consumable to
+        any letter given a mapping by this option, unless it is an identified
+        item of a different category. (eg: 'potion of curing:c' will result
+        in no other potion ever being auto-assigned to 'c' and unidentified
+        scrolls also avoiding it where possible, since they share the ?id menu
+        together.)
 
 ability_slot ^= <regex>:<ability letters>
         (Ordered list option, one value per line)
@@ -1518,10 +1520,10 @@ easy_door = true
 warn_hatches = false
         Ask for confirmation before using a one-way escape hatch or shaft.
 
-warn_contam_cost = false
-	Ask for confirmation before casting a spell with a contam cost, if it
-	is possible that casting it at your current level of magic contamination
-	could cause you to reach harmful levels of contamination.
+warn_contam_cost = true
+        Ask for confirmation before casting a spell with a contam cost, if it
+        is possible that casting it at your current level of magic contamination
+        could cause you to reach harmful levels of contamination.
 
 enable_recast_spell = true
         If enabled, allows recasting the previously cast spell by pressing
@@ -1567,9 +1569,9 @@ single_column_item_menus = true
         all menus are single-column regardless of the value of this option.
 
 show_paged_inventory = false
-	If set to true, the 'i' menu will divide the player's items into
-	pages (gear, potions, scrolls, and evocable items) in the same way
-	that the 'd'rop menu does.
+        If set to true, the 'i' menu will divide the player's items into
+        pages (gear, potions, scrolls, and evocable items) in the same way
+        that the 'd'rop menu does.
 
 3-h     Message and Display Enhancements.
 ------------------------------------------
@@ -1931,14 +1933,14 @@ action_panel_glyphs = false
         option is only available on webtiles.
 
 show_resist_percent = true
-	When set to true, the exact percentage of damage the player will take
-	from each element, based on their current pips of resistance, will be
-	shown on the % screen.
+        When set to true, the exact percentage of damage the player will take
+        from each element, based on their current pips of resistance, will be
+        shown on the % screen.
 
 always_show_doom_contam = false
-	If set to true, always display the doom and contam meters in the
-	upper-right of the side panel, even if the player doesn't currently
-	have any doom or contamination.
+        If set to true, always display the doom and contam meters in the
+        upper-right of the side panel, even if the player doesn't currently
+        have any doom or contamination.
 
 3-i     Colours (messages and menus)
 -----------------
@@ -2480,8 +2482,9 @@ tile_full_screen = auto
         width 1200, or height 800.
 
 tile_use_small_layout = auto
-        Alternative layout designed for very small screens. It is enabled by
-        default on Android.
+        Alternative layout designed for narrow screens. If auto, it will be
+        enabled when the available horizontal space is not enough to display the
+        normal layout in a comfortable way.
 
 tile_font_crt_file  = VeraMono.ttf
 tile_font_stat_file = VeraMono.ttf
@@ -2517,11 +2520,12 @@ tile_font_lbl_size  = 14
 tile_font_ft_light = false
         Selects 'light' font hinting.
 
-glyph_mode_font = monospace
+glyph_mode_font = DejaVu Sans Mono
         Font used to render the dungeon in glyph mode for WebTiles. If set to
-        monospace (default) or the font is not available, the browser's default
-        monospaced font will be used.
-        This option is only available on WebTiles.
+        monospace or the font is not available, the browser's default monospaced
+        font will be used. The default "DejaVu Sans Mono" is available as a
+        webfont (and is the same as used in the desktop version). This option
+        is only available on WebTiles.
 
 glyph_mode_font_size = 24
         Font size (in points) for the dungeon view in glyph mode for WebTiles.

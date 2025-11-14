@@ -90,14 +90,26 @@ static monster* _place_pghost_aux(const mgen_data &mg, const monster *leader,
 
 static int _fill_apostle_band(monster& mons, monster_type* band);
 
-static bool _habitable_feat(habitat_type ht, dungeon_feature_type feat)
+bool habitat_is_compatible(habitat_type ht, dungeon_feature_type feat)
 {
     if ((ht & HT_MALIGN_GATEWAY) && feat == DNGN_MALIGN_GATEWAY)
         return true;
 
-    // No monster may be placed in walls etc.
+    // Only wall-walkers may be placed in walls.
     if (feat_is_solid(feat))
-        return false;
+    {
+        // Wallwalking monsters are themed as tunneling through earth, not
+        // phasing through features (like our ghosts can't)- thus, only walls
+        // and statues allowed. No interactions with permarock allowed also
+        // includes not passing through such.
+        if ((feat_is_wall(feat) && !feat_is_permarock(feat) ||
+           feat_is_statuelike(feat)))
+        {
+            return ht & HT_WALLS_ONLY;
+        }
+        else
+            return false;
+    }
 
 #if TAG_MAJOR_VERSION == 34
     // Monsters can't use teleporters, and standing there would look just wrong.
@@ -144,7 +156,7 @@ habitat_type habitat_for_any(const vector<monster_type>& mon_types)
  */
 bool monster_habitable_feat(const monster* mon, dungeon_feature_type feat)
 {
-    return _habitable_feat(mons_habitat(*mon), feat);
+    return habitat_is_compatible(mons_habitat(*mon), feat);
 }
 
 /**
@@ -155,7 +167,7 @@ bool monster_habitable_feat(const monster* mon, dungeon_feature_type feat)
  */
 bool monster_habitable_feat(monster_type mt, dungeon_feature_type feat)
 {
-    return _habitable_feat(mons_class_habitat(mt), feat);
+    return habitat_is_compatible(mons_class_habitat(mt), feat);
 }
 
 bool monster_habitable_grid(const monster* mon, const coord_def& pos)
@@ -166,6 +178,23 @@ bool monster_habitable_grid(const monster* mon, const coord_def& pos)
 bool monster_habitable_grid(monster_type mt, const coord_def& pos)
 {
     return monster_habitable_feat(mt, env.grid(pos));
+}
+
+/**
+ * Solid features are only inhabitable one tile deep so monsters don't get
+ * spawned inside large areas of wall (and not findable by the player). This
+ * checks if the tile is solid there is at least one non-solid adjacent.
+ */
+bool has_non_solid_adjacent(coord_def pos)
+{
+    if (!feat_is_solid(env.grid(pos)))
+        return true;
+    for (adjacent_iterator ai(pos); ai; ++ai)
+    {
+        if (in_bounds(*ai) && !feat_is_solid(env.grid(*ai)))
+            return true;
+    }
+    return false;
 }
 
 static int _ood_fuzzspan(level_id &place)
@@ -501,9 +530,7 @@ monster_type fixup_zombie_type(const monster_type cls,
     return base_type;
 }
 
-// Checks if the monster is ok to place at mg_pos. If force_location
-// is true, then we'll be less rigorous in our checks, in particular
-// allowing land monsters to be placed in shallow water.
+// Checks if the monster is ok to place at mg_pos.
 static bool _valid_monster_generation_location(const mgen_data &mg,
                                                 const coord_def &mg_pos)
 {
@@ -522,7 +549,8 @@ static bool _valid_monster_generation_location(const mgen_data &mg,
     if (!monster_habitable_grid(montype, mg_pos)
         || (mg.behaviour != BEH_FRIENDLY
             && is_sanctuary(mg_pos)
-            && !mons_is_tentacle_segment(montype)))
+            && !mons_is_tentacle_segment(montype))
+        || !has_non_solid_adjacent(mg_pos))
     {
         return false;
     }
@@ -733,8 +761,7 @@ monster* place_monster(mgen_data mg, bool force_pos, bool dont_place)
         && !mg.summoner
         && !(mg.extra_flags & MF_WAS_IN_VIEW))
     {
-        if (in_bounds(mon->pos()) && !cell_is_solid(mon->pos()))
-            big_cloud(CLOUD_TLOC_ENERGY, mon, mon->pos(), 3 + random2(3), 3, 3);
+        big_cloud(CLOUD_TLOC_ENERGY, mon, mon->pos(), 3 + random2(3), 3, 3);
 
         if (you.can_see(*mon)
              && !crawl_state.generating_level
@@ -1352,7 +1379,7 @@ static monster* _place_monster_aux(const mgen_data &mg, const monster *leader,
     {
         blame_prefix = "summoned by ";
 
-        if (mg.summoner != nullptr && mg.summoner->alive()
+        if (mg.summoner != nullptr && mg.summoner->alive_or_reviving()
             && mg.summoner->type == MONS_MARA)
         {
             blame_prefix = "woven by ";
@@ -1383,10 +1410,9 @@ static monster* _place_monster_aux(const mgen_data &mg, const monster *leader,
     // by the Fire Storm spell); a deceased summoner's mindex might also
     // be reused to create its summon, so make sure the summon doesn't
     // think it has summoned itself.
-    else if (mg.summoner != nullptr && mg.summoner->alive()
+    else if (mg.summoner != nullptr && mg.summoner->alive_or_reviving()
              && mg.summoner != mon)
     {
-        ASSERT(mg.summoner->alive());
         mon->summoner = mg.summoner->mid;
         if (mg.summoner->is_player())
             mons_add_blame(mon, blame_prefix + "the player character");
@@ -1481,6 +1507,8 @@ static monster* _place_monster_aux(const mgen_data &mg, const monster *leader,
     {
         mon->add_ench(mon_enchant(ENCH_REGENERATION, 0, &you, random_range(300, 500)));
     }
+
+    mon->origin_level = level_id::current();
 
     return mon;
 }
@@ -1835,6 +1863,9 @@ static const map<monster_type, band_set> bands_by_leader = {
     { MONS_BOGGART,         { {}, {{ BAND_BOGGARTS, {2, 5} }}}},
     { MONS_PRINCE_RIBBIT,   { {}, {{ BAND_BLINK_FROGS, {2, 5}, true }}}},
     { MONS_BLINK_FROG,      { {}, {{ BAND_BLINK_FROGS, {2, 5} }}}},
+    { MONS_BES_KEMWAR, { {0, 0, [](){ return player_in_branch(BRANCH_DUNGEON)&&
+                                             x_chance_in_y(4, 5); }},
+                                   {{ BAND_BES_KEMWAR, {1, 2} }}}},
     { MONS_WIGHT,           { {}, {{ BAND_WIGHTS, {2, 5} }}}},
     { MONS_ANCIENT_CHAMPION, { {2, 0, []() {
         return !player_in_hell(); }},
@@ -1931,7 +1962,7 @@ static const map<monster_type, band_set> bands_by_leader = {
     { MONS_MNOLEG,          { {}, {{ BAND_MNOLEG, {5, 8}, true }}}},
     { MONS_LOM_LOBON,       { {}, {{ BAND_LOM_LOBON, {5, 8}, true }}}},
     { MONS_DEATH_SCARAB,  { {0, 0, []() {
-        return you.where_are_you == BRANCH_TOMB;
+        return you.where_are_you != BRANCH_SPIDER;
     }},                            {{ BAND_DEATH_SCARABS, {3, 6} }}}},
     { MONS_SERAPH,          { {}, {{ BAND_HOLIES, {1, 4}, true }}}},
     { MONS_IRON_GIANT,      { {}, {{ BAND_IRON_GOLEMS, {2, 3}, true }}}},
@@ -1961,8 +1992,6 @@ static const map<monster_type, band_set> bands_by_leader = {
     }},                            {{ BAND_CAGES, {1, 3}, true }}}},
     { MONS_WENDIGO, { {}, {{ BAND_SIMULACRA, {2, 6} }}}},
     { MONS_JOSEPHINA, { {}, {{ BAND_SIMULACRA, {4, 6}, true }}}},
-    { MONS_BONE_DRAGON, { {0, 0, []() { return player_in_hell(); }},
-                                   {{ BAND_BONE_DRAGONS, {1, 2}} }}},
     { MONS_EIDOLON, { {0, 0, []() { return player_in_hell(); }},
                                    {{ BAND_SPECTRALS, {2, 6}, true} }}},
     { MONS_GRUNN,            { {}, {{ BAND_OBLIVION_HOUNDS, {2, 4}, true }}}},
@@ -1970,7 +1999,8 @@ static const map<monster_type, band_set> bands_by_leader = {
     { MONS_UFETUBUS,         { {}, {{ BAND_UFETUBI, {1, 2} }}}},
     { MONS_SIN_BEAST,        { {}, {{ BAND_SIN_BEASTS, {1, 2} }}}},
     { MONS_KOBOLD_BLASTMINER, { {}, {{ BAND_BLASTMINER, {0, 2} }}}},
-    { MONS_ARACHNE,          { {}, {{ BAND_ORB_SPIDERS, {3, 5}}}}},
+    { MONS_ARACHNE,          { {}, {{ BAND_ORB_SPIDERS, {3, 5} }}}},
+    { MONS_ROCK_FISH,        { {}, {{ BAND_ROCK_FISH, {1, 2} }}}},
 
     // special-cased band-sizes
     { MONS_SPRIGGAN_DRUID,  { {3}, {{ BAND_SPRIGGAN_DRUID, {0, 1}, true }}}},
@@ -1981,6 +2011,7 @@ static const map<monster_type, band_set> bands_by_leader = {
     { MONS_SPHINX_MARAUDER, { {}, {{ BAND_HARPIES, {0, 1} }}}},
     { MONS_PROTEAN_PROGENITOR, { {}, {{ BAND_PROTEAN_PROGENITORS, {0, 1} }}}},
     { MONS_THERMIC_DYNAMO, { {}, {{ BAND_THERMIC_DYNAMOS, {0, 1} }}}},
+    { MONS_UNDERTAKER, { {}, {{ BAND_UNDERTAKERS, {0, 1} }}}},
 };
 
 static band_type _choose_band(monster_type mon_type, int *band_size_p,
@@ -2181,6 +2212,11 @@ static band_type _choose_band(monster_type mon_type, int *band_size_p,
             band_size = 1;
         break;
 
+    case MONS_UNDERTAKER:
+        if (x_chance_in_y(3, 4))
+            band_size = 1;
+        break;
+
     default: ;
     }
 
@@ -2222,6 +2258,7 @@ static const map<band_type, vector<member_possibilities>> band_membership = {
     { BAND_WOLVES,              {{{MONS_WOLF, 1}}}},
     { BAND_DUVESSA,             {{{MONS_DOWAN, 1}}}},
     { BAND_GNOLLS,              {{{MONS_GNOLL, 1}}}},
+    { BAND_ROCK_FISH,           {{{MONS_ROCK_FISH, 1}}}},
     { BAND_HARPIES,             {{{MONS_HARPY, 1}}}},
     { BAND_RAIJU,               {{{MONS_RAIJU, 1}}}},
     { BAND_WIGHTS,              {{{MONS_WIGHT, 1}}}},
@@ -2256,6 +2293,7 @@ static const map<band_type, vector<member_possibilities>> band_membership = {
     { BAND_SALAMANDERS,         {{{MONS_SALAMANDER, 1}}}},
     { BAND_SPARK_WASPS,         {{{MONS_SPARK_WASP, 1}}}},
     { BAND_UGLY_THINGS,         {{{MONS_UGLY_THING, 1}}}},
+    { BAND_UNDERTAKERS,         {{{MONS_UNDERTAKER, 1}}}},
     { BAND_DREAM_SHEEP,         {{{MONS_DREAM_SHEEP, 1}}}},
     { BAND_DEATH_SCARABS,       {{{MONS_DEATH_SCARAB, 1}}}},
     { BAND_ORANGE_DEMONS,       {{{MONS_ORANGE_DEMON, 1}}}},
@@ -2282,7 +2320,6 @@ static const map<band_type, vector<member_possibilities>> band_membership = {
     { BAND_PRESERVER,           {{{MONS_DEEP_TROLL, 10},
                                   {MONS_POLTERGUARDIAN, 2}},
                                 {{MONS_DEEP_TROLL, 1}}}},
-    { BAND_BONE_DRAGONS,        {{{MONS_BONE_DRAGON, 1}}}},
     { BAND_SPECTRALS,           {{{MONS_SPECTRAL_THING, 1}}}},
     { BAND_UFETUBI,             {{{MONS_UFETUBUS, 1}}}},
     { BAND_SIN_BEASTS,          {{{MONS_SIN_BEAST, 1}}}},
@@ -2314,6 +2351,10 @@ static const map<band_type, vector<member_possibilities>> band_membership = {
                                   {MONS_SIMULACRUM, 2}}}},
     { BAND_HELL_KNIGHTS,        {{{MONS_HELL_KNIGHT, 3},
                                   {MONS_NECROMANCER, 1}}}},
+    { BAND_BES_KEMWAR,          {{{MONS_JELLY, 3},
+                                  {MONS_PHANTOM, 3},
+                                  {MONS_SLEEPCAP, 3},
+                                  {MONS_BES_KEMWAR, 1}}}},
     { BAND_MIXED_WRAITHS,       {{{MONS_FREEZING_WRAITH, 7},
                                   {MONS_PHANTASMAL_WARRIOR, 3}}}},
     { BAND_DEATH_KNIGHT_STANDARD, {{{MONS_GHOUL, 1},
@@ -2388,6 +2429,7 @@ static const map<band_type, vector<member_possibilities>> band_membership = {
                                   {MONS_OGRE, 2}}}},
     { BAND_KOBOLD_DEMONOLOGIST, {{{MONS_KOBOLD, 4},
                                   {MONS_KOBOLD_BRIGAND, 2},
+                                  {MONS_KOBOLD_GEOMANCER, 1},
                                   {MONS_KOBOLD_DEMONOLOGIST, 1}}}},
     // Favour tougher naga suited to melee, compared to normal naga bands
     { BAND_GUARDIAN_SERPENT,    {{{MONS_NAGA_MAGE, 5}, {MONS_NAGA_WARRIOR, 10}},
@@ -2865,7 +2907,9 @@ private:
 
     int best_distance;
     int nfound;
+public:
     bool levelgen;
+    bool preferred;
 public:
     // Terrain that we can't spawn on, but that we can skip through.
     set<dungeon_feature_type> passable;
@@ -2897,7 +2941,8 @@ public:
         {
             return false;
         }
-        if (!_habitable_feat(habitat_wanted, env.grid(dc)))
+        if (!habitat_is_compatible(habitat_wanted, env.grid(dc))
+            || !has_non_solid_adjacent(dc))
         {
             if (passable.count(env.grid(dc)))
                 good_square(dc);
@@ -2909,8 +2954,8 @@ public:
             greedy_place = dc;
             best_distance = traveled_distance;
         }
-        else
-            good_square(dc);
+
+        good_square(dc);
         return false;
     }
 };
@@ -3170,7 +3215,7 @@ bool you_can_see_habitable_spot_near(coord_def pos, habitat_type habitat,
         if (!cell_see_cell(pos, *ri, LOS_NO_TRANS))
             continue;
 
-        if (!_habitable_feat(habitat, env.grid(*ri)))
+        if (!habitat_is_compatible(habitat, env.grid(*ri)))
             continue;
 
         return true;

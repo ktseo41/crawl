@@ -1894,7 +1894,10 @@ bool oni_drunken_swing()
             attk.never_cleave = true;
 
             if (!attk.would_prompt_player())
+            {
                 attk.launch_attack_set();
+                count_action(CACT_ATTACK, ATTACK_DRUNKEN_BRAWLING);
+            }
         }
 
         return true;
@@ -2029,6 +2032,7 @@ bool drink(item_def* potion)
     else
         dec_mitm_item_quantity(potion->index(), 1);
     count_action(CACT_USE, OBJ_POTIONS);
+    count_action(CACT_DRINK, potion->sub_type);
     you.turn_is_over = true;
 
     // This got deferred from PotionExperience::effect to prevent SIGHUP abuse.
@@ -2236,7 +2240,7 @@ static item_def* _scroll_choose_weapon(bool alreadyknown, const string &pre_msg,
     return target;
 }
 
-// Returns true if the scroll is used up.
+// Returns true if succesful
 static bool _handle_brand_weapon(bool alreadyknown, const string &pre_msg)
 {
     item_def* weapon = nullptr;
@@ -2257,10 +2261,15 @@ static bool _handle_brand_weapon(bool alreadyknown, const string &pre_msg)
         weapon = _scroll_choose_weapon(alreadyknown, pre_msg, SCR_BRAND_WEAPON);
 
     if (!weapon)
-        return !alreadyknown;
+        return false;
 
     _brand_weapon(*weapon);
     return true;
+}
+
+bool uncancel_brand_weapon()
+{
+    return _handle_brand_weapon(false, "");
 }
 
 bool enchant_weapon(item_def &wpn, bool quiet)
@@ -2337,7 +2346,7 @@ static bool _identify(bool alreadyknown, const string &pre_msg)
     }
 
     if (!itemp)
-        return !alreadyknown;
+        return false;
 
     item_def& item = *itemp;
     if (alreadyknown)
@@ -2367,6 +2376,11 @@ static bool _identify(bool alreadyknown, const string &pre_msg)
     return true;
 }
 
+bool uncancel_identify()
+{
+    return _identify(false, "");
+}
+
 static bool _handle_enchant_weapon(bool alreadyknown, const string &pre_msg)
 {
     item_def* weapon = nullptr;
@@ -2390,7 +2404,7 @@ static bool _handle_enchant_weapon(bool alreadyknown, const string &pre_msg)
     }
 
     if (!weapon)
-        return !alreadyknown;
+        return false;
 
     const bool success = enchant_weapon(*weapon, false);
     if (success && weapon->plus == MAX_WPN_ENCHANT)
@@ -2399,6 +2413,11 @@ static bool _handle_enchant_weapon(bool alreadyknown, const string &pre_msg)
         crawl_state.cancel_cmd_repeat();
     }
     return true;
+}
+
+bool uncancel_enchant_weapon()
+{
+    return _handle_enchant_weapon(false, "");
 }
 
 bool enchant_armour(item_def &arm, bool quiet)
@@ -2454,7 +2473,7 @@ static bool _handle_enchant_armour(bool alreadyknown, const string &pre_msg)
     }
 
     if (!target)
-        return !alreadyknown;
+        return false;
 
     // Okay, we may actually (attempt to) enchant something.
     if (alreadyknown)
@@ -2472,6 +2491,11 @@ static bool _handle_enchant_armour(bool alreadyknown, const string &pre_msg)
     }
 
     return true;
+}
+
+bool uncancel_enchant_armour()
+{
+    return _handle_enchant_armour(false, "");
 }
 
 static void _vulnerability_scroll()
@@ -2493,6 +2517,39 @@ static void _vulnerability_scroll()
 
     you.strip_willpower(&you, dur, true);
     mpr("A wave of despondency washes over your surroundings.");
+}
+
+static bool _handle_amnesia(bool alreadyknown)
+{
+    while (true)
+    {
+        bool aborted = cast_selective_amnesia() == -1;
+        if (!aborted)
+            break;
+        if (!alreadyknown)
+        {
+            if (crawl_state.seen_hups)
+                return false;
+            if (!yesno("Really abort (and waste the scroll)?", false, 0))
+                continue;
+        }
+
+        // The scroll has been aborted
+        canned_msg(MSG_OK);
+        return false;
+    }
+    return true;
+}
+
+bool uncancel_amnesia()
+{
+    return _handle_amnesia(false);
+}
+
+bool uncancel_blinking()
+{
+    dist target;
+    return controlled_blink(false, &target) != spret::abort;
 }
 
 static bool _is_cancellable_scroll(scroll_type scroll)
@@ -2894,11 +2951,20 @@ bool read(item_def* scroll, dist *target)
             break;
         }
 
-        cancel_scroll = (controlled_blink(alreadyknown, target)
-                         == spret::abort) && alreadyknown;
+        if (!alreadyknown)
+        {
+            mpr(pre_succ_msg);
 
-        if (!cancel_scroll)
-            mpr(pre_succ_msg); // ordering is iffy but w/e
+            run_uncancel(UNC_BLINKING);
+        }
+        else
+        {
+            cancel_scroll = (controlled_blink(alreadyknown, target)
+                == spret::abort);
+
+            if (!cancel_scroll)
+                mpr(pre_succ_msg); // ordering is iffy but w/e
+        }
     }
         break;
 
@@ -3016,9 +3082,12 @@ bool read(item_def* scroll, dist *target)
             mpr(pre_succ_msg);
             mpr("It is a scroll of enchant weapon.");
             // included in default force_more_message (to show it before menu)
-        }
 
-        cancel_scroll = !_handle_enchant_weapon(alreadyknown, pre_succ_msg);
+            run_uncancel(UNC_ENCHANT_WEAPON);
+        }
+        else
+            cancel_scroll = !_handle_enchant_weapon(alreadyknown, pre_succ_msg);
+
         break;
 
     case SCR_BRAND_WEAPON:
@@ -3027,9 +3096,12 @@ bool read(item_def* scroll, dist *target)
             mpr(pre_succ_msg);
             mpr("It is a scroll of brand weapon.");
             // included in default force_more_message (to show it before menu)
-        }
 
-        cancel_scroll = !_handle_brand_weapon(alreadyknown, pre_succ_msg);
+            run_uncancel(UNC_BRAND_WEAPON);
+        }
+        else
+            cancel_scroll = !_handle_brand_weapon(alreadyknown, pre_succ_msg);
+
         break;
 
     case SCR_IDENTIFY:
@@ -3040,8 +3112,12 @@ bool read(item_def* scroll, dist *target)
             // included in default force_more_message (to show it before menu)
             // Do this here so it doesn't turn up in the ID menu.
             identify_item(*scroll);
+
+            run_uncancel(UNC_IDENTIFY);
         }
+        else
             cancel_scroll = !_identify(alreadyknown, pre_succ_msg);
+
         break;
 
     case SCR_ENCHANT_ARMOUR:
@@ -3050,8 +3126,12 @@ bool read(item_def* scroll, dist *target)
             mpr(pre_succ_msg);
             mpr("It is a scroll of enchant armour.");
             // included in default force_more_message (to show it before menu)
+
+            run_uncancel(UNC_ENCHANT_ARMOUR);
         }
-        cancel_scroll = !_handle_enchant_armour(alreadyknown, pre_succ_msg);
+        else
+            cancel_scroll = !_handle_enchant_armour(alreadyknown, pre_succ_msg);
+
         break;
 #if TAG_MAJOR_VERSION == 34
     case SCR_CURSE_WEAPON:
@@ -3087,20 +3167,12 @@ bool read(item_def* scroll, dist *target)
             mpr("You feel forgetful for a moment.");
             break;
         }
-        bool done;
-        bool aborted;
-        do
-        {
-            aborted = cast_selective_amnesia() == -1;
-            done = !aborted
-                   || alreadyknown
-                   || crawl_state.seen_hups
-                   || yesno("Really abort (and waste the scroll)?",
-                            false, 0);
-            cancel_scroll = aborted && alreadyknown;
-        } while (!done);
-        if (aborted)
-            canned_msg(MSG_OK);
+
+        if (!alreadyknown)
+            run_uncancel(UNC_AMNESIA);
+        else
+            cancel_scroll = !_handle_amnesia(alreadyknown);
+
         break;
 
     default:
@@ -3123,6 +3195,7 @@ bool read(item_def* scroll, dist *target)
             dec_mitm_item_quantity(scroll->index(), 1);
 
         count_action(CACT_USE, OBJ_SCROLLS);
+        count_action(CACT_READ, scroll->sub_type);
     }
 
     if (!alreadyknown
@@ -3193,8 +3266,13 @@ string cannot_put_on_talisman_reason(const item_def& talisman, bool temp)
     if (you.form != you.default_form && temp)
         return "you need to leave your temporary form first.";
 
-    if (trans == transformation::hive && you_worship(GOD_OKAWARU))
-        return "you have forsworn all allies in Okawaru's name.";
+    if (trans == transformation::hive)
+    {
+        if (you_worship(GOD_OKAWARU))
+            return "you have forsworn all allies in Okawaru's name.";
+        if (you.get_mutation_level(MUT_NO_LOVE))
+            return "you are loveless.";
+    }
 
     return "";
 }
@@ -3227,6 +3305,7 @@ bool use_talisman(item_def& talisman)
              real_item.name(DESC_YOUR).c_str(), talisman_type_name(new_type).c_str());
 
         real_item.sub_type = new_type;
+        seen_item(real_item);
         return use_talisman(real_item);
     }
 

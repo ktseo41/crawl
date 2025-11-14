@@ -42,7 +42,6 @@
 #include "god-passive.h"
 #include "god-prayer.h"
 #include "hints.h"
-#include "hints.h"
 #include "hiscores.h"
 #include "invent.h"
 #include "item-name.h"
@@ -90,6 +89,7 @@ static int _autopickup_subtype(const item_def &item);
 static void _autoinscribe_item(item_def& item);
 static void _autoinscribe_floor_items();
 static void _autoinscribe_inventory();
+static void _maybe_disable_autopickup_for_dropped_items(vector<SelItem> &items);
 static void _multidrop(vector<SelItem> tmp_items);
 static bool _merge_items_into_inv(item_def &it, int quant_got,
                                   int &inv_slot, bool quiet);
@@ -804,6 +804,7 @@ bool item_is_worth_listing(const item_def& item)
     {
     case OBJ_STAVES:
     case OBJ_WANDS:
+    case OBJ_JEWELLERY:
         return true;
     case OBJ_WEAPONS:
         return is_unrandom_artefact(item)
@@ -1857,7 +1858,7 @@ static void _get_book(item_def& it)
         mprf("You pick up %s and begin reading...", it.name(DESC_A).c_str());
 
         if (!library_add_spells(spells_in_book(it)))
-            mpr("Unfortunately, you learned nothing new.");
+            mpr("Unfortunately, you learned nothing new or useful.");
 
         taken_new_item(it.base_type);
 
@@ -2069,7 +2070,7 @@ static bool _merge_stackable_item_into_inv(const item_def &it, int quant_got,
         you.last_pickup[inv_slot] = quant_got;
 
         // If we are purchasing an identified item from a shop, maybe update our
-        // item slot. (Pre-identified items on the floor will already be handle
+        // item slot. (Pre-identified items on the floor will already be handled
         // by seen_item().)
         const short old_slot = you.inv[inv_slot].slot;
         if (inventory_category_for(it) == INVENT_CONSUMABLE
@@ -2921,6 +2922,7 @@ void drop_last()
     else
     {
         you.last_pickup.clear();
+        _maybe_disable_autopickup_for_dropped_items(items_to_drop);
         _multidrop(items_to_drop);
     }
 }
@@ -4632,14 +4634,14 @@ bool get_item_by_name(item_def *item, const char* specs,
         for (const auto i : all_item_subtypes(item->base_type))
         {
             item->sub_type = i;
-            size_t pos = lowercase_string(item->name(DESC_PLAIN)).find(specs);
+            size_t pos = lowercase_string(item->name(DESC_DBNAME)).find(specs);
             if (pos != string::npos)
             {
                 // Earliest match is the winner.
                 if (pos < best_index)
                 {
                     if (create_for_real)
-                        mpr(item->name(DESC_PLAIN));
+                        mpr(item->name(DESC_DBNAME));
                     type_wanted = i;
                     best_index = pos;
                 }
@@ -4793,21 +4795,7 @@ bool get_item_by_name(item_def *item, const char* specs,
         break;
 
     case OBJ_JEWELLERY:
-        if (jewellery_is_amulet(*item))
-            break;
-
-        switch (item->sub_type)
-        {
-        case RING_SLAYING:
-        case RING_PROTECTION:
-        case RING_EVASION:
-        case RING_STRENGTH:
-        case RING_DEXTERITY:
-        case RING_INTELLIGENCE:
-            item->plus = 5;
-        default:
-            break;
-        }
+        item->plus = determine_jewellery_plus(item->sub_type);
 
     default:
         break;
@@ -5157,7 +5145,7 @@ bool jewellery_is_redundant(const item_def& item)
     int count = 0;
     for (int i = 0; i < MAX_GEAR; ++i)
     {
-        if (you.inv[i].is_type(OBJ_JEWELLERY, type))
+        if (you.inv[i].is_type(OBJ_JEWELLERY, type) && !is_artefact(you.inv[i]))
         {
             ++count;
             if (count >= limit)

@@ -342,9 +342,9 @@ const char* missile_brand_name(const item_def &item, mbn_type t)
     {
 #if TAG_MAJOR_VERSION == 34
     case SPMSL_FLAME:
-        return "flame";
+        return t == MBN_TERSE ? "obsolete" : "obsolescence";
     case SPMSL_FROST:
-        return "frost";
+        return t == MBN_TERSE ? "obsolete" : "obsolescence";
 #endif
     case SPMSL_POISONED:
         return t == MBN_NAME ? "poisoned" : "poison";
@@ -352,27 +352,27 @@ const char* missile_brand_name(const item_def &item, mbn_type t)
         return t == MBN_NAME ? "curare-tipped" : "curare";
 #if TAG_MAJOR_VERSION == 34
     case SPMSL_EXPLODING:
-        return t == MBN_TERSE ? "explode" : "exploding";
+        return "obsolete";
     case SPMSL_STEEL:
-        return "steel";
+        return "obsolete";
     case SPMSL_RETURNING:
-        return t == MBN_TERSE ? "return" : "returning";
+        return t == MBN_TERSE ? "obsolete" : "obsolescence";
     case SPMSL_PENETRATION:
-        return t == MBN_TERSE ? "penet" : "penetration";
+        return t == MBN_TERSE ? "obsolete" : "obsolescence";
 #endif
     case SPMSL_SILVER:
         return "silver";
 #if TAG_MAJOR_VERSION == 34
     case SPMSL_PARALYSIS:
-        return "paralysis";
+        return t == MBN_TERSE ? "obsolete" : "obsolescence";
     case SPMSL_SLOW:
-        return t == MBN_TERSE ? "slow" : "slowing";
+        return t == MBN_TERSE ? "obsolete" : "obsolescence";
     case SPMSL_SLEEP:
-        return t == MBN_TERSE ? "sleep" : "sleeping";
+        return t == MBN_TERSE ? "obsolete" : "obsolescence";
     case SPMSL_CONFUSION:
-        return t == MBN_TERSE ? "conf" : "confusion";
+        return t == MBN_TERSE ? "obsolete" : "obsolescence";
     case SPMSL_SICKNESS:
-        return t == MBN_TERSE ? "sick" : "sickness";
+        return t == MBN_TERSE ? "obsolete" : "obsolescence";
 #endif
     case SPMSL_FRENZY:
         return t == MBN_NAME ? "datura-tipped" : "datura";
@@ -407,7 +407,7 @@ static const char *weapon_brands_terse[] =
 #endif
     "chaos",
 #if TAG_MAJOR_VERSION == 34
-    "evade", "confuse",
+    "obsolete", "confuse",
 #endif
     "penet", "reap", "spect", "num_special", "acid",
 #if TAG_MAJOR_VERSION > 34
@@ -423,21 +423,21 @@ static const char *weapon_brands_verbose[] =
 {
     "", "flaming", "freezing", "holy wrath", "electrocution",
 #if TAG_MAJOR_VERSION == 34
-    "orc slaying", "dragon slaying",
+    "obsolescence", "obsolescence",
 #endif
     "venom", "protection", "draining", "speed", "heavy",
 #if TAG_MAJOR_VERSION == 34
-    "flame", "frost",
+    "obsolescence", "obsolescence",
 #endif
     "vampirism", "pain", "antimagic", "distortion",
 #if TAG_MAJOR_VERSION == 34
-    "reaching", "returning",
+    "obsolescence", "obsolescence",
 #endif
     "chaos",
 #if TAG_MAJOR_VERSION == 34
-    "evasion", "confusion",
+    "obsolescence", "confusion",
 #endif
-    "penetration", "reaping", "spectralizing", "num_special", "acid",
+    "penetration", "reaping", "spectralising", "num_special", "acid",
 #if TAG_MAJOR_VERSION > 34
     "confusion",
 #endif
@@ -451,19 +451,19 @@ static const char *weapon_brands_adj[] =
 {
     "", "flaming", "freezing", "holy", "electric",
 #if TAG_MAJOR_VERSION == 34
-    "orc-killing", "dragon-slaying",
+    "obsolete", "obsolete",
 #endif
     "venomous", "protective", "draining", "fast", "heavy",
 #if TAG_MAJOR_VERSION == 34
-    "flaming", "freezing",
+    "obsolete", "obsolete",
 #endif
     "vampiric", "painful", "antimagic", "distorting",
 #if TAG_MAJOR_VERSION == 34
-    "reaching", "returning",
+    "obsolete", "obsolete",
 #endif
     "chaotic",
 #if TAG_MAJOR_VERSION == 34
-    "evasive", "confusing",
+    "obsolete", "confusing",
 #endif
     "penetrating", "reaping", "spectral", "num_special", "acidic",
 #if TAG_MAJOR_VERSION > 34
@@ -529,7 +529,7 @@ const char* special_armour_type_name(special_armour_type ego, bool terse)
         {
         case SPARM_NORMAL:            return "";
 #if TAG_MAJOR_VERSION == 34
-        case SPARM_RUNNING:           return "running";
+        case SPARM_RUNNING:           return "obsolescence";
 #endif
         case SPARM_FIRE_RESISTANCE:   return "fire resistance";
         case SPARM_COLD_RESISTANCE:   return "cold resistance";
@@ -541,7 +541,6 @@ const char* special_armour_type_name(special_armour_type ego, bool terse)
         case SPARM_INTELLIGENCE:      return "intelligence";
         case SPARM_PONDEROUSNESS:     return "ponderousness";
         case SPARM_FLYING:            return "flying";
-
         case SPARM_WILLPOWER:         return "willpower";
         case SPARM_PROTECTION:        return "protection";
         case SPARM_STEALTH:           return "stealth";
@@ -549,7 +548,7 @@ const char* special_armour_type_name(special_armour_type ego, bool terse)
         case SPARM_POSITIVE_ENERGY:   return "positive energy";
         case SPARM_ARCHMAGI:          return "the Archmagi";
 #if TAG_MAJOR_VERSION == 34
-        case SPARM_JUMPING:           return "jumping";
+        case SPARM_JUMPING:           return "obsolescence";
 #endif
         case SPARM_CORROSION_RESISTANCE: return "corrosion resistance";
         case SPARM_REFLECTION:        return "reflection";
@@ -557,7 +556,7 @@ const char* special_armour_type_name(special_armour_type ego, bool terse)
         case SPARM_HURLING:           return "hurling";
         case SPARM_REPULSION:         return "repulsion";
 #if TAG_MAJOR_VERSION == 34
-        case SPARM_CLOUD_IMMUNE:      return "cloud immunity";
+        case SPARM_CLOUD_IMMUNE:      return "obsolescence";
 #endif
         case SPARM_HARM:              return "harm";
         case SPARM_SHADOWS:           return "shadows";
@@ -727,7 +726,7 @@ const char* potion_type_name(int potiontype)
     }
 }
 
-static const char* scroll_type_name(int scrolltype)
+const char* scroll_type_name(int scrolltype)
 {
     switch (static_cast<scroll_type>(scrolltype))
     {
@@ -784,15 +783,15 @@ const char* jewellery_effect_name(int jeweltype, bool terse)
         case RING_PROTECTION_FROM_FIRE:  return "protection from fire";
         case RING_POISON_RESISTANCE:     return "poison resistance";
         case RING_PROTECTION_FROM_COLD:  return "protection from cold";
-        case RING_STRENGTH:              return "strength";
         case RING_SLAYING:               return "slaying";
         case RING_SEE_INVISIBLE:         return "see invisible";
         case RING_RESIST_CORROSION:      return "resist corrosion";
         case RING_EVASION:               return "evasion";
-#if TAG_MAJOR_VERSION == 34
-        case RING_SUSTAIN_ATTRIBUTES:    return "sustain attributes";
-#endif
         case RING_STEALTH:               return "stealth";
+#if TAG_MAJOR_VERSION == 34
+        case RING_SUSTAIN_ATTRIBUTES:    return "obsoleteness";
+#endif
+        case RING_STRENGTH:              return "strength";
         case RING_DEXTERITY:             return "dexterity";
         case RING_INTELLIGENCE:          return "intelligence";
         case RING_WIZARDRY:              return "wizardry";
@@ -803,67 +802,78 @@ const char* jewellery_effect_name(int jeweltype, bool terse)
 #if TAG_MAJOR_VERSION == 34
         case RING_FIRE:                  return "obsoleteness";
         case RING_ICE:                   return "obsoleteness";
-        case RING_TELEPORTATION:         return "teleportation";
-        case RING_TELEPORT_CONTROL:      return "teleport control";
+        case RING_TELEPORTATION:         return "obsoleteness";
+        case RING_TELEPORT_CONTROL:      return "obsoleteness";
 #endif
-        case AMU_MANA_REGENERATION: return "magic regeneration";
-        case AMU_ACROBAT:           return "the acrobat";
+        case AMU_MANA_REGENERATION:      return "magic regeneration";
+        case AMU_ACROBAT:                return "the acrobat";
 #if TAG_MAJOR_VERSION == 34
-        case AMU_RAGE:              return "rage";
-        case AMU_THE_GOURMAND:      return "gourmand";
-        case AMU_HARM:              return "harm";
-        case AMU_CONSERVATION:      return "conservation";
-        case AMU_CONTROLLED_FLIGHT: return "controlled flight";
-        case AMU_INACCURACY:        return "inaccuracy";
+        case AMU_RAGE:                   return "obsoleteness";
+        case AMU_THE_GOURMAND:           return "obsoleteness";
+        case AMU_HARM:                   return "obsoleteness";
+        case AMU_CONSERVATION:           return "obsoleteness";
+        case AMU_CONTROLLED_FLIGHT:      return "obsoleteness";
+        case AMU_INACCURACY:             return "obsoleteness";
 #endif
-        case AMU_NOTHING:           return "nothing";
-        case AMU_GUARDIAN_SPIRIT:   return "guardian spirit";
-        case AMU_FAITH:             return "faith";
-        case AMU_REFLECTION:        return "reflection";
-        case AMU_REGENERATION:      return "regeneration";
-        case AMU_WILDSHAPE:         return "wildshape";
-        case AMU_ALCHEMY:           return "alchemy";
-        case AMU_DISSIPATION:       return "dissipation";
+        case AMU_GUARDIAN_SPIRIT:        return "guardian spirit";
+        case AMU_FAITH:                  return "faith";
+        case AMU_REFLECTION:             return "reflection";
+        case AMU_REGENERATION:           return "regeneration";
+        case AMU_WILDSHAPE:              return "wildshape";
+        case AMU_ALCHEMY:                return "alchemy";
+        case AMU_DISSIPATION:            return "dissipation";
+        case AMU_NOTHING:                return "nothing";
         default: return "buggy jewellery";
         }
     }
     else
     {
-        if (jewellery_base_ability_string(jeweltype)[0] != '\0')
-            return jewellery_base_ability_string(jeweltype);
         switch (static_cast<jewellery_type>(jeweltype))
         {
 #if TAG_MAJOR_VERSION == 34
-        case RING_REGENERATION:          return "obsoleteness";
-        case RING_ATTENTION:             return "obsoleteness";
+        case RING_REGENERATION:          return "obsolete";
+        case RING_ATTENTION:             return "obsolete";
 #endif
         case RING_PROTECTION:            return "AC";
         case RING_PROTECTION_FROM_FIRE:  return "rF+";
         case RING_POISON_RESISTANCE:     return "rPois";
         case RING_PROTECTION_FROM_COLD:  return "rC+";
-        case RING_STRENGTH:              return "Str";
         case RING_SLAYING:               return "Slay";
         case RING_SEE_INVISIBLE:         return "sInv";
         case RING_RESIST_CORROSION:      return "rCorr";
         case RING_EVASION:               return "EV";
         case RING_STEALTH:               return "Stlth+";
+#if TAG_MAJOR_VERSION == 34
+        case RING_SUSTAIN_ATTRIBUTES:    return "obsolete";
+#endif
+        case RING_STRENGTH:              return "Str";
         case RING_DEXTERITY:             return "Dex";
         case RING_INTELLIGENCE:          return "Int";
+        case RING_WIZARDRY:              return "Wiz";
         case RING_MAGICAL_POWER:         return "MP+9";
         case RING_FLIGHT:                return "Fly";
         case RING_POSITIVE_ENERGY:       return "rN+";
         case RING_WILLPOWER:             return "Will+";
-        case RING_WIZARDRY:              return "Wiz";
 #if TAG_MAJOR_VERSION == 34
-        case RING_FIRE:                  return "obsoleteness";
-        case RING_ICE:                   return "obsoleteness";
+        case RING_FIRE:                  return "obsolete";
+        case RING_ICE:                   return "obsolete";
+        case RING_TELEPORTATION:         return "obsolete";
+        case RING_TELEPORT_CONTROL:      return "obsolete";
 #endif
-        case AMU_REGENERATION:           return "Regen";
         case AMU_MANA_REGENERATION:      return "RegenMP";
-#if TAG_MAJOR_VERSION == 34
-        case AMU_RAGE:                   return "+Rage";
-#endif
         case AMU_ACROBAT:                return "Acrobat";
+#if TAG_MAJOR_VERSION == 34
+        case AMU_RAGE:                   return "obsolete";
+        case AMU_THE_GOURMAND:           return "obsolete";
+        case AMU_HARM:                   return "obsolete";
+        case AMU_CONSERVATION:           return "obsolete";
+        case AMU_CONTROLLED_FLIGHT:      return "obsolete";
+        case AMU_INACCURACY:             return "obsolete";
+#endif
+        case AMU_GUARDIAN_SPIRIT:        return "Spirit";
+        case AMU_FAITH:                  return "Faith";
+        case AMU_REFLECTION:             return "Reflect";
+        case AMU_REGENERATION:           return "Regen";
         case AMU_WILDSHAPE:              return "Wildshape";
         case AMU_ALCHEMY:                return "Alch+";
         case AMU_DISSIPATION:            return "Dissipate";
@@ -1103,7 +1113,7 @@ static const char* _book_type_name(int booktype)
     case BOOK_DRAGON:                 return "the Dragon";
     case BOOK_BURGLARY:               return "Burglary";
     case BOOK_DREAMS:                 return "Dreams";
-    case BOOK_TRANSMUTATION:         return "Transmutation";
+    case BOOK_TRANSMUTATION:          return "Transmutation";
     case BOOK_BEASTS:                 return "Beasts";
     case BOOK_SPECTACLE:              return "Spectacle";
     case BOOK_WINTER:                 return "Winter";
@@ -1842,7 +1852,7 @@ string item_def::name_aux(description_level_type desc, bool terse, bool ident,
         if (is_artefact(*this) && !dbname)
         {
             if (know_type)
-                buff << "staff";
+                buff << staff_type_name(static_cast<stave_type>(sub_type)) << " staff";
             // TODO: crop long artefact names when not controlled by webtiles
             buff << get_artefact_name(*this, ident);
             if (!know_type)
@@ -3327,8 +3337,10 @@ bool is_useless_item(const item_def &item, bool temp, bool ident)
             special_armour_type ego = get_armour_ego_type(item);
             switch (ego)
             {
+#if TAG_MAJOR_VERSION == 34
             case SPARM_SPIRIT_SHIELD:
                 return you.spirit_shield(false);
+#endif
             case SPARM_REPULSION:
                 return temp && have_passive(passive_t::upgraded_storm_shield)
                        || you.get_mutation_level(MUT_DISTORTION_FIELD) == 3;

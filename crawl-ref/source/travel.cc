@@ -1917,17 +1917,34 @@ bool travel_pathfind::path_examine_point(const coord_def &c)
     // proceeds from source, so we take transporters, but for determining moves
     // we work in reverse from destination back to source, so we pathfind
     // through the landing sites.
-    if (runmode == RMODE_TRAVEL || runmode == RMODE_NOT_RUNNING)
+    if (runmode == RMODE_TRAVEL || runmode == RMODE_NOT_RUNNING
+        || runmode == RMODE_CONNECTIVITY)
     {
         if (floodout && env.grid(c) == DNGN_TRANSPORTER)
         {
-            LevelInfo &li = travel_cache.get_level_info(level_id::current());
-            transporter_info *ti = li.get_transporter(c);
-            if (ti && ti->destination != INVALID_COORD)
+            coord_def tdest;
+
+            // For connectivity checks, we have to use the map markers directly,
+            // since the travel cache info will not be set up yet. (These are only
+            // done in floodout mode, so it isn't necessary to do this for
+            // transporter landings.)
+            if (runmode == RMODE_CONNECTIVITY)
             {
-                if (path_flood(c, ti->destination))
-                    found_target = true;
+                map_position_marker* mark = get_position_marker_at(c, DNGN_TRANSPORTER);
+                if (mark)
+                    tdest = mark->dest;
             }
+            // But for travel checks, rely only on the player's knowledge instead.
+            else
+            {
+                LevelInfo &li = travel_cache.get_level_info(level_id::current());
+                transporter_info *ti = li.get_transporter(c);
+                if (ti && ti->destination != INVALID_COORD)
+                    tdest = ti->destination;
+            }
+
+            if (!tdest.origin() && path_flood(c, tdest))
+                found_target = true;
         }
         else if (!floodout && env.grid(c) == DNGN_TRANSPORTER_LANDING)
         {
@@ -1986,9 +2003,16 @@ void fill_travel_point_distance(const coord_def& youpos,
 
 extern map<branch_type, set<level_id> > stair_level;
 
-static void _find_parent_branch(branch_type br, branch_type *pb, int *pd)
+static void _find_parent_branch(branch_type br, branch_type *pb, int *pd, bool ignore_knowledge = false)
 {
     *pb = parent_branch(br);   // Check depth before using *pb.
+
+    // If doing internal calculations, don't rely on player knowledge of stairs.
+    if (ignore_knowledge)
+    {
+        *pd = brentry[br].depth;
+        return;
+    }
 
     if (auto levels = map_find(stair_level, br))
     {
@@ -2014,7 +2038,8 @@ static void _find_parent_branch(branch_type br, branch_type *pb, int *pd)
 // { BRANCH_SNAKE, 3 }, { BRANCH_LAIR, 5 }, { BRANCH_DUNGEON, 11 }
 // (Assuming, of course, that the vector started out empty.)
 //
-static void _trackback(vector<level_id> &vec, branch_type branch, int subdepth)
+static void _trackback(vector<level_id> &vec, branch_type branch, int subdepth,
+                       bool ignore_knowledge = false)
 {
     if (subdepth < 1)
         return;
@@ -2026,9 +2051,9 @@ static void _trackback(vector<level_id> &vec, branch_type branch, int subdepth)
     {
         branch_type pb;
         int pd;
-        _find_parent_branch(branch, &pb, &pd);
+        _find_parent_branch(branch, &pb, &pd, ignore_knowledge);
         if (pd)
-            _trackback(vec, pb, pd);
+            _trackback(vec, pb, pd, ignore_knowledge);
     }
 }
 
@@ -2056,7 +2081,10 @@ static void _track_intersect(vector<level_id> &cur, vector<level_id> &targ,
 // Returns the number of stairs the player would need to take to go from
 // the 'first' level to the 'second' level. If there's no obvious route between
 // 'first' and 'second', returns -1. If first == second, returns 0.
-int level_distance(level_id first, level_id second)
+//
+// If ignore_knowledge = true, use internal information rather than relying on
+// stairs the player knows the destination of.
+int level_distance(level_id first, level_id second, bool ignore_knowledge)
 {
     if (first == second)
         return 0;
@@ -2068,8 +2096,8 @@ int level_distance(level_id first, level_id second)
         return abs(first.depth - second.depth);
 
     // Figure out the dungeon structure between the two levels.
-    _trackback(fv, first.branch, first.depth);
-    _trackback(sv, second.branch, second.depth);
+    _trackback(fv, first.branch, first.depth, ignore_knowledge);
+    _trackback(sv, second.branch, second.depth, ignore_knowledge);
 
     level_id intersect;
     _track_intersect(fv, sv, &intersect);
@@ -2084,7 +2112,7 @@ int level_distance(level_id first, level_id second)
     {
         distance += first.depth;
 
-        _find_parent_branch(first.branch, &first.branch, &first.depth);
+        _find_parent_branch(first.branch, &first.branch, &first.depth, ignore_knowledge);
         if (!first.depth)
             return -1;
     }
@@ -5324,15 +5352,12 @@ bool stairs_destination_is_excluded(const stair_info &si)
             return false;
         }
 
-        // Check for exclusions that cover the stair destination, but ignore
-        // those that have radius 1: those exclude travel in the _other_
-        // direction only (from the destination to here, not from here to the
-        // destination)
+        // Check for exclusions that cover the stair destination
         const exclude_set &excludes = dest_li->get_excludes();
         for (auto entry : excludes)
         {
             const travel_exclude &ex = entry.second;
-            if (ex.in_bounds(dest.pos) && ex.radius > 1)
+            if (ex.in_bounds(dest.pos))
                 return true;
         }
     }

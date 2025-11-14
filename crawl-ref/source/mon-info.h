@@ -240,7 +240,7 @@ enum monster_info_flags
     MB_FROZEN_IN_TERROR,
     MB_SOUL_SPLINTERED,
     MB_ENGULFING_PLAYER,
-    MB_DOUBLED_HEALTH,
+    MB_DOUBLED_VIGOUR,
     MB_ABJURABLE,
     MB_UNREWARDING,
     MB_MINION,
@@ -449,12 +449,10 @@ struct monster_info : public monster_info_base
 
     // These should be kept in sync with the actor equivalents
     // (Maybe unify somehow?)
-    // Note: actor version is now actor::cannot_act.
-    bool cannot_move() const;
+    bool cannot_act() const;
     bool asleep() const;
     bool incapacitated() const;
     bool airborne() const;
-    bool ground_level() const;
 
     bool is_named() const
     {
@@ -492,6 +490,8 @@ struct monster_info : public monster_info_base
     bool unravellable() const;
 
     monster* get_known_summoner() const;
+
+    bool is_stationary() const;
 
 protected:
     string _core_name() const;

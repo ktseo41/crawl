@@ -120,8 +120,8 @@ enum monclass_flag_type : uint64_t
     /// An ancestor granted by Hepliaklqana
     M_ANCESTOR          = BIT(35),
 
-    /// Gets a special name, like the Hellbinder
-    M_ALWAYS_NAMED      = BIT(36),
+    // Was M_ALWAYS_NAMED and before that M_ALWAYS_CORPSE
+                       // BIT(36),
 
     /// prefer ranged attacks over melee
     M_PREFER_RANGED     = BIT(37),
@@ -155,9 +155,11 @@ enum monclass_flag_type : uint64_t
     /// derived undead can't be randomly generated
     M_NO_GEN_DERIVED    = BIT(47),
 
-                        //BIT(48), // was M_REQUIRE_BAND
+    /// Is a priest regardless of whether they have priest spells
+    M_PRIEST            = BIT(48),
 
-                        //BIT(49), // was M_HYBRID
+    /// Monster name always starts with "the ". Only used by uniques.
+    M_NAME_THE          = BIT(49),
 
                         //BIT(50),
 
@@ -313,9 +315,15 @@ enum monster_flag_type : uint64_t
     // death (eg: ball lightning)
     MF_PERSISTS           = BIT(43),
 
+    /// Is a priest regardless of whether they have priest spells
+    MF_PRIEST             = BIT(44),
+
 };
 DEF_BITFIELD(monster_flags_t, monster_flag_type);
 
 constexpr monster_flags_t MF_NAME_MASK = MF_NAME_REPLACE;
 constexpr monster_flags_t MF_MELEE_MASK = MF_FIGHTER | MF_TWO_WEAPONS
                                         | MF_ARCHER;
+constexpr monster_flags_t MF_ALL_NAMES = MF_NAME_MASK | MF_NAME_DESCRIPTOR
+                                       | MF_NAME_DEFINITE | MF_NAME_SPECIES
+                                       | MF_NAME_ZOMBIE | MF_NAME_NOCORPSE;

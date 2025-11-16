@@ -1,0 +1,695 @@
+====================
+Commit: 1bed09eb72e1c7586d02d84545f076820d75aa76
+Author: bohyeon <ktseo41@gmail.com>
+Date: 2025-11-14 21:54:12
+
+Title: Merge pull request #1 from ktseo41/claude/pull-master-updates-014zcrut62MACrHzesCXGRiN
+
+Message:
+
+
+====================
+Commit: 982c9fe40d30926536b2586dcc1f9aeed30560d3
+Author: gammafunk <gammafunk@gmail.com>
+Date: 2025-11-14 00:35:45
+
+Title: Don't discard Lua stack output in crash logs
+
+Message:
+The crash log handling tried to write the clua and dlua stacks to the
+crash log, but accidentally wrote the output the stderr, where it
+generally wouldn't be seen. Write this output directly to the crash log,
+as this code intended.
+
+
+====================
+Commit: f20446e8b00c45efbf330a32434ef46e33656bad
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 19:55:40
+
+Title: Fix crash when looking up "serpent of hell".
+
+Message:
+In the help lookup.
+
+If the serpent of hell we look up has no branch or no valid branch
+specified, we now default to Gehenna instead of asserting.
+
+(I don't know how the old routine got the right serpent of hell without
+a specified branch before the monster lost "the " from its name, but
+this does seem to work, and being able to trigger an assert by mistyping
+a hell branch name is a worse problem.)
+
+Closes #4905.
+
+
+====================
+Commit: ace6acc8d7951b7bf26c02c0611e0cdfb95e9a15
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 19:15:18
+
+Title: Remove obsolete ref to SoH casting LCS in zh too.
+
+Message:
+
+
+====================
+Commit: f6d26d3853cb075dc7c3d1df837a686058597f9f
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 16:52:03
+
+Title: Remove obsolete ref to SoH casting LCS.
+
+Message:
+
+
+====================
+Commit: d1bae87cbbc7289f1bf95367b3c0d601a2c51863
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 16:41:53
+
+Title: Fix spell message lookups for "the " monsters.
+
+Message:
+
+
+====================
+Commit: ac7b574f705836e5ee31075e551f3aaa4eff11ed
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 16:07:35
+
+Title: Put 'prepended "the " removal' in its own func.
+
+Message:
+So that the same bit of code isn't copied all over the place. This uses
+erase() instead of substr(), but should work the same way (and one
+instance used erase() too).
+
+
+====================
+Commit: a2439a720428022062b6ff0a98bf3092f3ca3f7c
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 15:11:11
+
+Title: Fix key-based searches for "the " monsters.
+
+Message:
+
+
+====================
+Commit: a1d8492f13ae9ab09205f56a0d4cec513176f02d
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 14:48:16
+
+Title: Fix simulacrum movement messages again.
+
+Message:
+While "the " is usually tacked on properly, it needs to be removed for
+this case.
+
+
+====================
+Commit: 5a2a1e7401b3c3a99cdc77b1c85ce6fc17564129
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 14:06:31
+
+Title: Remove "the " from Serpent of Hell help lookups.
+
+Message:
+
+
+====================
+Commit: 6eb87179c30eb0c0eef94e018cff81b00a52e65d
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 11:14:40
+
+Title: Remove now-redundant monster enum setting.
+
+Message:
+Since the Enchantress, the Lernaean hydra, the Royal Jelly, and the
+(Gehenna) Serpent of Hell now have names that match their enums.
+
+
+====================
+Commit: fd5d032a44f0d08655715cca043972f011137abe
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 11:04:12
+
+Title: Fix naming of the placed zombified Enchantress.
+
+Message:
+With "the " tacked on properly, "Enchantress" needs to be treated as an
+adjective again.
+
+
+====================
+Commit: 55c4f4719a22f8270c4c95d84561405e6ff3a482
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-13 10:48:48
+
+Title: More properly fix "the " monster names.
+
+Message:
+So that e.g. corpses are handled as well.
+
+This reverts commit 8f2be1da978432ed6379265058321079e8e48ce7.
+
+
+====================
+Commit: e5db3684d5541629cf8eeb3e634214e99800c981
+Author: Nikolai Lavsky <3328424+nlavsky@users.noreply.github.com>
+Date: 2025-11-13 14:41:42
+
+Title: fix: Prince Ribbit zombie having a non-zombie tile (tekkud)
+
+Message:
+After 22f87b589, Prince Ribbit zombie looks too alive for an undead.
+
+This commit gives him a human *zombie* tile instead.
+
+
+====================
+Commit: 35e14e307726dcc3f03cc5514f29b17892fcfdb8
+Author: Implojin <implosionwow@gmail.com>
+Date: 2025-11-13 04:28:56
+
+Title: Quiet a gcc warning [-Wmaybe-uninitialized]
+
+Message:
+Previously, if these circle_def initializers had been called with a
+theoretical circle_type that was unhandled in this switch, they would have
+then subsequently called init_bbox with an uninitialized radius, which
+recent versions of GCC were unhappy about.
+
+
+====================
+Commit: ce413c7a676eea64b6e837fe4d9453bea88578ac
+Author: Implojin <implosionwow@gmail.com>
+Date: 2025-11-13 03:42:22
+
+Title: Rename moninf cannot_move to cannot_act
+
+Message:
+The corresponding actor methods here were renamed in 47ca5a425f but the
+moninf method was inexplicably left using the older naming.
+
+
+====================
+Commit: b3fd7c6d4359feaf5cd1f6acf87e75942e352590
+Author: RypoFalem <rypofalem@gmail.com>
+Date: 2025-11-12 22:13:28
+
+Title: Fix messaging when paralyzing sleeping enemies (qwarkbark)
+
+Message:
+Previously when applying bolt paralyse to sleeping or petrified monsters
+the log would print "Nothing appears to happen", which sounded like a
+failure. This ambiguous messaging had been in place since ancient
+crawl due to various bits of code previously not distinguishing between the
+individual top-tier stab statuses, but these days paralyse has its own
+status in the UI and we're free to be explicit about what's happening.
+
+Here we fix this messaging, and tweak its wording to be clear about what
+status is being applied.
+
+[Committer's notes: Edited both the message and commit wording.]
+
+
+====================
+Commit: ab067d37321556a0dae97db530820bfba7dc543f
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 23:47:18
+
+Title: Add another triumphant Terence line.
+
+Message:
+
+
+====================
+Commit: e2fda637c3f8c071de202fd776d419ff6a0f87b3
+Author: regret-index <cloudofregret@hotmail.com>
+Date: 2025-11-12 23:50:06
+
+Title: Some banishment + Doom Xom adjustments (adelrune)
+
+Message:
+* After the large refactoring of 6874458, one of the enum entries in the
+  vector list of Xom's potential actions was filled with a function
+  instead: xom_maybe_reverts_banishment. Due to being assembled as an
+  enum at the start of loading up Crawl, this meant that Xom lost the
+  capability to banish players entirely unless they started the game
+  at the valid true banishment XL (>=6 with wrath, >=9 without). This
+  should fix this up to re-enable Xom-sourced banishment for Xom
+  worshippers (at an even rarer chance than previously), with slightly
+  more likeliness of seeing pseudo-banishment as chance compensation.
+  (There are some dev concerns of those XLs being spoilery magic numbers,
+  but nobody ever needs to fully understand Xom in many other aspects,
+  scaling Xom's threat level versus one's XL in other ways has succeeded
+  heavily in making them more fun and popular in de-emphasizing
+  unavoidable deaths, and pacifist Xom runs to avoid gaining XP are
+  decidedly impractical anyway).
+
+* Through the simplest solution of duplicating an entry and giving it
+  some long documentation for such, Xom is now slightly more likely to
+  apply Doom to the undead even more than they otherwise are for missing
+  both drain and mutation effects. While there are further reworks to
+  Xom still planned that should completely remove Xomscumming concerns
+  entirely, this still seems fine for now both in terms of letting undead
+  Xom worshippers see a reasonably-varied strategic damage system and
+  in terms of mostly threatening scumming strategies (since the Xom Doom
+  effect can't directly give banes without reaching boredom or wrath).
+
+(While I'm here, I've also renamed the debug-side "bad mutations" effect
+to the more accurate "random mutations", to help those reading the wizmode
+Xom debug output. It's a little inaccurate- there's a bad mutation
+guaranteed only if one's in wrath- but it should be less confusing than
+implying Xom's raw bad mutation rate is that particularly high.)
+
+
+====================
+Commit: 75fabc873b1ea4b16ddf1148870b863e860e5984
+Author: Isaac Clancy <ikec4@yahoo.com>
+Date: 2025-11-13 15:03:45
+
+Title: Fix looking up rock walls in Pandemonium
+
+Message:
+Searching for "rock" in the feature lookup menu while in Pandemonium
+would show a list of features with one of them being "A wall of the
+weird stuff which makes up Pandemonium" and no entry for rock walls.
+The tile for this entry was missing and going into the entry would show
+a description box that was blank apart from a single off centered full
+stop.
+
+As the rest of the feature search is independent of the branch you are
+in (e.g. search for doors in crypt shows generic door tiles not crypt
+ones) I think it's best to show the normal description for rock walls
+while in Pandemonium.
+
+
+====================
+Commit: e6352ea329d96e94f1c749215be3beac6b2c6865
+Author: Isaac Clancy <ikec4@yahoo.com>
+Date: 2025-11-10 15:42:58
+
+Title: Show actual feature tile flavour in more menus
+
+Message:
+Show the actual flavour of a feature in all menus that show a feature on
+the map. For example when examining a dagger in an open door in crypt,
+show the right door tile for crypt rather than a generic door tile.
+
+
+====================
+Commit: 655ffec7b15299c0037a0b7f482e7aab61295cb4
+Author: regret-index <cloudofregret@hotmail.com>
+Date: 2025-11-12 18:55:02
+
+Title: Micro vault review
+
+Message:
+Most notably, this clears up two bug reports from cool 3 / tekkud:
+player-facing debug statements were left after bugfixing Trove books in
+a086fab, and depth-scaling for ebering_necropolis_ghost_xom has been using
+absdepth instead of dgn.persist.necropolis_difficulty() as far back as the
+original Necropolis transfer in 72caabb.
+
+
+====================
+Commit: 25542d231b0964c7c47b295ebd4876c1da8de197
+Author: regret-index <cloudofregret@hotmail.com>
+Date: 2025-11-12 17:56:21
+
+Title: Another small targeted vault batch
+
+Message:
+Four vaults: a Nemelex gimmick overflow and a Qazlal decorative overflow to
+try and raise the average of the god-specific overflow altars up, another
+Shoals decor vault since I'd like to have that branch get a decor
+arrangement next to vary up Shoals:4 serial-rune-vault floors, and another
+Abyss entrance vault to try and deal with a previous count of 9 being too
+low for something that appear multiple times in each game.
+
+
+====================
+Commit: b7cf73b23f64a4aee3a56a6b4cec2f4df864339c
+Author: regret-index <cloudofregret@hotmail.com>
+Date: 2025-11-10 20:32:35
+
+Title: Move fire bats out of Depths lava and into D lava
+
+Message:
+Fire bats are essentially doing absolutely nothing in Depths in any real
+threat capacity, aside from providing variety in a harmless-monster
+fashion we've moved quite far away from over the past decade's worth of
+branch updates. The weight of their cutting from Depths is given to the
+other harmless Depths lava monster choices, fire elementals and molten
+gargoyles, which also are unlikely to do much at the depth but which
+provide some less-comically-weak variety versus the full Snake
+salamander selection Depths uses.
+
+Meanwhile, in a place that could always use more variety, I'm putting a
+very tiny amount of fire bats to spawn in D:7-15, in the same depth as
+when lava snakes start spawning and two floors past when the somewhat
+comparable ice beast spawns (which have better AC and HP + rPois, but
+worse speed). A fiery monster has been conspicuously missing from D for a
+long while (outside of crimson imps, cut in 60f854e), and these can
+easily fulfill such in the branch where we already prominently use bats
+at a time where their statlines can actually be meaningfully relevant. It
+does lower the novelty of Volcanoes very slightly, but those have more
+than enough monster set options that I'm not nearly as concerned about
+those as I've been with the earliest portals.
+
+
+====================
+Commit: 7e2540d371ebdc715363fd023909ad5cf5f718f9
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 15:51:19
+
+Title: Simplify all-name-related mask handling a bit.
+
+Message:
+
+
+====================
+Commit: 7925ddab227dc2ddd2f5a9f2908891ac7fef18c3
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 15:43:47
+
+Title: Add flag mask for all name-related flags.
+
+Message:
+Copied over from where they're all used in
+mon-poly.cc:change_monster_type(), since such a mask could be useful
+elsewhere.
+
+
+====================
+Commit: fbe7a93f4e591c712b4f9fd94311fb6b5577fa9e
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 15:03:49
+
+Title: Disallow zombifying Grunn, since he's undead.
+
+Message:
+Closes #4898.
+
+
+====================
+Commit: 33d5737683ab3f57320a04f08e92ecfc34bc6855
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 14:54:38
+
+Title: Update refs to "the " monsters in the database.
+
+Message:
+
+
+====================
+Commit: a303eb1cfa15022050baa4d04b737f8f2ce432cb
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 14:59:15
+
+Title: Update refs to "the " monsters in the tests.
+
+Message:
+
+
+====================
+Commit: df6b5afb8257ea9b4825785125904eba7f147194
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 14:42:55
+
+Title: Update more "the Serpent of Hell" refs I missed.
+
+Message:
+
+
+====================
+Commit: 8f2be1da978432ed6379265058321079e8e48ce7
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 14:24:24
+
+Title: Properly add "the " for single monsters in view.
+
+Message:
+
+
+====================
+Commit: bf86f010d473c73d318e7c896e55cb7b3876822a
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 14:20:02
+
+Title: Update DES files for "the " uniques (oops).
+
+Message:
+
+
+====================
+Commit: 04421dc4fa4fd13c28caf74440a0f2542b9adc5a
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 13:24:22
+
+Title: Reorder polymorphed unique checks a bit.
+
+Message:
+So that they're in the same order as name_zombie().
+
+
+====================
+Commit: dc246fff1ad78531cb766d1d79a5119b5b01ea41
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 09:29:24
+
+Title: Revert "Fix the message naming unique simulacra (#3887)."
+
+Message:
+Now unique simulacra are named as expected, since none of them have to
+manually work around prepended "the ".
+
+This reverts commit b736c3cf914cf80daadf080b12090c21b9cb5c5e.
+
+
+====================
+Commit: 8a1c8ea48e77ed739ecc150c853c0222d6cc2f66
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 09:57:40
+
+Title: Improve handling of monsters with "the " names.
+
+Message:
+Flag them as such, and make use of it so that their names don't have to
+start with "the " internally. The tooltips for them accordingly no
+longer start with "the " either, but since their names are unique, this
+is a minor change.
+
+
+====================
+Commit: 2f27fca2f599485244ee3b77e2fa2c49222017b2
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-12 12:42:24
+
+Title: Tweak formerly outdated comment again.
+
+Message:
+Since the player can create zombies, but not draugr.
+
+
+====================
+Commit: b1a7a50d982409d23798843c4900767e99405dcc
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-11 23:23:20
+
+Title: Add missing species to Gehenna Serpent of Hell.
+
+Message:
+
+
+====================
+Commit: 94ae4be39d3003dc5fe80018ea6dbb23e2406a9c
+Author: Isaac Clancy <ikec4@yahoo.com>
+Date: 2025-11-12 15:28:25
+
+Title: Fix crash when Blork dies as a vengeance target
+
+Message:
+When worshipping Beogh and Blorkula kills one of your orcs, he will be
+marked as a vengeance target. If you then beat him up and he turned into
+bats, it would count as you killing the last vengeance target and end
+your vengeance. When he then reformed (including reforming dead when you
+killed his last bat) he would still count as a vengeance target which
+would result in a crash when he died as you weren't under vengeance.
+Instead, transfer the vengeance to the bats when he splits and then back
+to him when he reforms.
+
+
+====================
+Commit: 84510d75b0a895d89b9a817848fa257fb34767f9
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-11 18:34:38
+
+Title: Fix spacing.
+
+Message:
+
+
+====================
+Commit: ab8dd1b751e329b045f4b41c6952a1df7b36829b
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-11 18:29:43
+
+Title: Update an outdated comment.
+
+Message:
+Since undead skeletons are no longer a thing.
+
+
+====================
+Commit: 8bcb7b97902b55390b6641ff8613c287ca468be5
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-10 23:22:07
+
+Title: Add another Donald line for Vehumet.
+
+Message:
+
+
+====================
+Commit: c9a0f1e6c0a707d82521cfb582fbf47e12dd311b
+Author: guillaume <riou.guillaume@hotmail.com>
+Date: 2025-11-10 22:22:37
+
+Title: Add revenant's first spell to their library
+
+Message:
+This fixes an issue where revenants could have messages like
+"You add the spell X to your library" when picking up parchment and books
+for a spell that they already had learned. This also affected the book inspection
+ui where the spell was both greyed out but not considered known.
+
+
+====================
+Commit: f84a12ef0209b4010ff212ca83c979285fef2976
+Author: Isaac Clancy <ikec4@yahoo.com>
+Date: 2025-11-11 13:55:31
+
+Title: Fix crash when pending revival as a felid
+
+Message:
+When a monster tries to attack a dead felid player, we were canceling
+the attack but not spending any energy. This caused the monster to try
+taking infinite turns attacking which triggered an assert.
+
+
+====================
+Commit: a6f5bdc0430cf01b436c7865cc623161a5653886
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-10 16:57:21
+
+Title: Fix spelling.
+
+Message:
+
+
+====================
+Commit: 87edb9777882743b448b47234d61cda93f675741
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-10 07:59:10
+
+Title: Pluralise a weather name for artefacts.
+
+Message:
+So that it matches the other weather names.
+
+
+====================
+Commit: 89123b03c11ed0e2a866543d73caf330b3f9f8a6
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-10 07:58:12
+
+Title: Add another instrument name to artefacts.
+
+Message:
+
+
+====================
+Commit: 72e09e7ad306c320d10fc7b2110c3db33a8872c0
+Author: Isaac Clancy <ikec4@yahoo.com>
+Date: 2025-11-07 15:23:10
+
+Title: Fix felids receiving attacks while dead
+
+Message:
+Unlike monster's that count as dead while pending revival, the player
+counted as alive. This caused them to to receive attacks while dead,
+which usually didn't matter as most of the effects from the attacks were
+cleaned up when reviving. However, not all effects are cleared on
+reviving and you do end up with messages in the message log that don't
+make a log of sense for a dead character. Instead, count felids that are
+pending revival as dead and fix up any of the checks that should still
+affect them (or a monster) when pending revival.
+
+Fixes #4845
+
+
+====================
+Commit: 0f358fb7c04b0bc006dcfbc7d54057f5a80727e8
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-09 15:50:13
+
+Title: Fix a Crazy Yiuf quote.
+
+Message:
+Properly transcribe the line from the Principia Discordia exactly as
+written.
+
+
+====================
+Commit: b9efe5695e7caf4807d6c942fc26b7dcce976844
+Author: RypoFalem <rypofalem@gmail.com>
+Date: 2025-11-05 19:48:13
+
+Title: art: Make exclusions more readable
+
+Message:
+As someone that is partially colorblind, exclusions were very difficult
+for me to read when placed over certain tiles. Shoals was the biggest
+culprit since the exclusions are hard to make out on top of sand and
+shallow/deep sea water tiles. Exclusions were also very difficult to see
+when placed over lava tiles. To address this, exclusions were given a
+transparent black outline and a central white gradient.
+
+Exclusion tiles connected with each other in a way that made it
+difficult to see where the center of a tile was, since the corners had
+the same crisscross pattern as the centers. I've seperated the corners
+so they are no longer connected. It's possible this might be more of an
+issue with the background tiles not having clear edges in some cases but
+this at least makes excluded zones easier to quickly evaluate.
+
+[Committer's notes: I've tweaked the tiles in rypofalem's PR a bit to try
+to help them stand out more in areas with red backgrounds like Volcano,
+and edited the above commit message accordingly. If anyone reading this
+has further suggestions or graphical tweaks to help colourblind folks,
+they're always welcome.
+
+Closes #4880.]
+
+
+====================
+Commit: ea88c4b8bb2d66031707cc13b603d3f4862997a8
+Author: David Lawrence Ramsey <pooka109@gmail.com>
+Date: 2025-11-07 02:29:26
+
+Title: Adjust description of the book of Transmutation.
+
+Message:
+Make it reference now-gone sludge elves, since they were known as
+transmuters when both the species and the job existed in-game, and the
+book has Fulsome Fusillade in it, which is thematically similar to the
+now-gone Fulsome Distillation spell.
+
+Also, at mumra's suggestion, replace the author's spider obsession with
+a butterfly obsession, since spider form is currently accessible via
+talisman, and butterfly form is not a thing at all.
+
+
